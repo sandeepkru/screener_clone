@@ -87,6 +87,8 @@ A modern stock analysis and screening tool for investors, similar to Screener.in
    # AWS_SECRET_ACCESS_KEY=your_aws_secret_key
    ```
 
+   > **Important:** You must obtain a valid API key from [Polygon.io](https://polygon.io/) and set it as `NEXT_PUBLIC_POLYGON_API_KEY` in your `.env.local` file. The application will not function properly without a valid API key. Never commit your actual API key to the repository.
+
 4. Start Redis server (if using local Redis):
    ```bash
    # Using Docker

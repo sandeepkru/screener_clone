@@ -32,8 +32,13 @@ export interface StockPrices {
 export type TimeRange = '1D' | '1W' | '1M' | '3M' | '1Y' | '5Y';
 
 // Use environment variables for API configuration
-const POLYGON_API_KEY = process.env.NEXT_PUBLIC_POLYGON_API_KEY || 'YtnvCxedt0rrFLOuASl6zizYHzg9wM5E';
+const POLYGON_API_KEY = process.env.NEXT_PUBLIC_POLYGON_API_KEY;
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.polygon.io';
+
+// Check if API key is available
+if (!POLYGON_API_KEY) {
+  console.warn('POLYGON_API_KEY is not set. API calls will fail. Please set NEXT_PUBLIC_POLYGON_API_KEY in your environment variables.');
+}
 
 // Cache TTLs in seconds
 const CACHE_TTL = {

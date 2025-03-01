@@ -12,6 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Check for required secrets
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::VERCEL_TOKEN is not set in GitHub secrets. Please add it to continue."
+            exit 1
+          fi
+          if [ -z "${{ secrets.NEXT_PUBLIC_POLYGON_API_KEY }}" ]; then
+            echo "::error::NEXT_PUBLIC_POLYGON_API_KEY is not set in GitHub secrets. Please add it to continue."
+            exit 1
+          fi
+          echo "All required secrets are set."
+      
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
       

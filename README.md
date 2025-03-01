@@ -5,10 +5,10 @@ A modern stock analysis and screening tool for investors, similar to Screener.in
 ## Screenshots
 
 ### Home Page
-![StockScreener Home Page](https://via.placeholder.com/800x400?text=StockScreener+Home+Page)
+![StockScreener Home Page](https://www.dropbox.com/scl/fi/26bm0nkmouwk1cpe8vfi0/Screenshot-2025-03-01-at-8.39.02-AM.png?rlkey=qz77g27ioato3a1xu8b2w6xnu&st=056h7riu&dl=1)
 
 ### Stock Detail Page
-![StockScreener Stock Detail](https://via.placeholder.com/800x400?text=StockScreener+Stock+Detail+Page)
+![StockScreener Stock Detail](https://www.dropbox.com/scl/fi/26bm0nkmouwk1cpe8vfi0/Screenshot-2025-03-01-at-8.39.02-AM.png?rlkey=qz77g27ioato3a1xu8b2w6xnu&st=n4ralttg&dl=1)
 
 ## Features
 

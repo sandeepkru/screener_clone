@@ -134,14 +134,35 @@ export default function StockChart({ symbol, name, prices }: StockChartProps) {
               dataKey="date" 
               tickFormatter={(date) => {
                 const dateObj = new Date(date);
-                if (timeRange === '1D') {
-                  return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                } else if (timeRange === '1W') {
-                  return dateObj.toLocaleDateString([], { weekday: 'short' });
-                } else {
-                  return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                switch (timeRange) {
+                  case '1D':
+                    return dateObj.toLocaleTimeString([], { hour: 'numeric' });
+                  case '1W':
+                    return dateObj.toLocaleDateString([], { weekday: 'short' });
+                  case '1M':
+                    return dateObj.getDate() === 1 || dateObj.getDate() === 15 
+                      ? dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                      : dateObj.getDate().toString();
+                  case '3M':
+                    return dateObj.getDate() === 1
+                      ? dateObj.toLocaleDateString([], { month: 'short' })
+                      : '';
+                  case '1Y':
+                    return dateObj.getMonth() % 2 === 0
+                      ? dateObj.toLocaleDateString([], { month: 'short' })
+                      : '';
+                  case '5Y':
+                    return dateObj.getMonth() === 0
+                      ? dateObj.toLocaleDateString([], { year: 'numeric' })
+                      : dateObj.getMonth() === 6
+                        ? 'Jul'
+                        : '';
+                  default:
+                    return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
                 }
               }}
+              interval="preserveStartEnd"
+              minTickGap={30}
               tick={{ fontSize: 12 }}
               axisLine={{ stroke: '#374151', opacity: 0.3 }}
               tickLine={{ stroke: '#374151', opacity: 0.3 }}

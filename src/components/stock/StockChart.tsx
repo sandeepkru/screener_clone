@@ -27,17 +27,19 @@ export default function StockChart({ symbol, name, prices }: StockChartProps) {
   const getPriceData = () => {
     switch (timeRange) {
       case '1D':
-        return prices.daily;
+        return prices.daily || [];
       case '1W':
-        return prices.weekly;
+        return prices.weekly || [];
       case '1M':
+        return prices.monthly || [];
       case '3M':
-        return prices.monthly;
+        return prices.monthly || [];
       case '1Y':
+        return prices.yearly || [];
       case '5Y':
-        return prices.yearly;
+        return prices.fiveYear || [];
       default:
-        return prices.daily;
+        return prices.daily || [];
     }
   };
   

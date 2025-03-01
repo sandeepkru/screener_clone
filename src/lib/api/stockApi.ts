@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { format, subDays, subMonths, subYears } from 'date-fns';
 import { ApiResponse, Company, StockData, StockPrice, TimeRange as ApiTimeRange } from '@/types';
 import cacheService from '../cache/cacheService';
+import { generateMockPrices } from '@/lib/utils/mockData';
 
 // Define the Stock and StockPrices types here since there's an issue with importing them
 export interface Stock {
@@ -23,6 +25,7 @@ export interface StockPrices {
   weekly: { date: string; price: number }[];
   monthly: { date: string; price: number }[];
   yearly: { date: string; price: number }[];
+  fiveYear: { date: string; price: number }[];
 }
 
 export type TimeRange = '1D' | '1W' | '1M' | '3M' | '1Y' | '5Y';
@@ -96,50 +99,6 @@ const mockCompanies: Company[] = [
   },
   // Add more mock companies as needed
 ];
-
-// Generate mock price data
-const generateMockPrices = (days: number, basePrice: number): StockPrice[] => {
-  const prices: StockPrice[] = [];
-  const now = new Date();
-  
-  // For 5Y data, we need to generate fewer points to avoid performance issues
-  // but ensure they span the full 5-year period
-  const step = days > 1000 ? Math.ceil(days / 60) : 1; // For 5Y, generate ~60 data points
-  
-  for (let i = days; i >= 0; i -= step) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-    
-    const volatility = 0.02; // 2% volatility
-    const change = basePrice * volatility * (Math.random() - 0.5);
-    const newPrice = basePrice + change;
-    
-    basePrice = newPrice;
-    
-    prices.push({
-      timestamp: date.getTime(),
-      open: newPrice - (newPrice * 0.005 * Math.random()),
-      high: newPrice + (newPrice * 0.01 * Math.random()),
-      low: newPrice - (newPrice * 0.01 * Math.random()),
-      close: newPrice,
-      volume: Math.floor(1000000 + Math.random() * 10000000),
-    });
-  }
-  
-  // Ensure we have at least the first and last data point
-  if (prices.length > 0 && prices[prices.length - 1].timestamp !== now.getTime()) {
-    prices.push({
-      timestamp: now.getTime(),
-      open: basePrice - (basePrice * 0.005 * Math.random()),
-      high: basePrice + (basePrice * 0.01 * Math.random()),
-      low: basePrice - (basePrice * 0.01 * Math.random()),
-      close: basePrice,
-      volume: Math.floor(1000000 + Math.random() * 10000000),
-    });
-  }
-  
-  return prices;
-};
 
 // Get company details
 export const getCompanyDetails = async (symbol: string): Promise<ApiResponse<Company>> => {
@@ -516,320 +475,44 @@ export async function getEnhancedStockDetails(symbol: string): Promise<Stock | n
 /**
  * Get stock prices with enhanced caching
  */
-export async function getEnhancedStockPrices(symbol: string): Promise<StockPrices | null> {
+export const getEnhancedStockPrices = async (symbol: string): Promise<StockPrices> => {
   try {
-    const dailyPrices = await getEnhancedDailyPrices(symbol);
-    const weeklyPrices = await getEnhancedWeeklyPrices(symbol);
-    const monthlyPrices = await getEnhancedMonthlyPrices(symbol);
-    const yearlyPrices = await getEnhancedYearlyPrices(symbol);
-    const fiveYearPrices = await getEnhanced5YearPrices(symbol);
-
+    console.log(`Fetching enhanced stock prices for ${symbol}`);
+    
+    // Fetch prices for different time ranges
+    const dailyPrices = await getStockPriceData(symbol, '1D');
+    const weeklyPrices = await getStockPriceData(symbol, '1W');
+    const monthlyPrices = await getStockPriceData(symbol, '1M');
+    const yearlyPrices = await getStockPriceData(symbol, '1Y');
+    const fiveYearPrices = await getStockPriceData(symbol, '5Y');
+    
     return {
-      daily: dailyPrices || [],
-      weekly: weeklyPrices || [],
-      monthly: monthlyPrices || [],
-      yearly: fiveYearPrices || yearlyPrices || [], // Use 5-year data if available, otherwise fall back to 1-year
+      daily: dailyPrices.data.map(price => ({
+        date: new Date(price.timestamp).toISOString(),
+        price: price.close
+      })),
+      weekly: weeklyPrices.data.map(price => ({
+        date: new Date(price.timestamp).toISOString(),
+        price: price.close
+      })),
+      monthly: monthlyPrices.data.map(price => ({
+        date: new Date(price.timestamp).toISOString(),
+        price: price.close
+      })),
+      yearly: yearlyPrices.data.map(price => ({
+        date: new Date(price.timestamp).toISOString(),
+        price: price.close
+      })),
+      fiveYear: fiveYearPrices.data.map(price => ({
+        date: new Date(price.timestamp).toISOString(),
+        price: price.close
+      }))
     };
   } catch (error) {
     console.error(`Error fetching enhanced stock prices for ${symbol}:`, error);
-    return null;
+    throw error;
   }
-}
-
-/**
- * Fetch daily stock prices (1D) with enhanced caching
- */
-async function getEnhancedDailyPrices(symbol: string): Promise<{ date: string; price: number }[] | null> {
-  try {
-    // Check cache first
-    const cacheKey = `stock:enhanced:prices:daily:${symbol}`;
-    const cachedData = await cacheService.get<{ date: string; price: number }[]>(cacheKey);
-    
-    if (cachedData) {
-      console.log(`Cache hit for enhanced daily prices: ${symbol}`);
-      return cachedData;
-    }
-    
-    console.log(`Cache miss for enhanced daily prices: ${symbol}, fetching from API`);
-    
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const formattedToday = today.toISOString().split('T')[0];
-    const formattedYesterday = yesterday.toISOString().split('T')[0];
-
-    const response = await fetch(
-      `${BASE_URL}/v2/aggs/ticker/${symbol}/range/5/minute/${formattedYesterday}/${formattedToday}?apiKey=${POLYGON_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch daily prices: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (!data.results) {
-      console.error('No results found for daily prices:', data);
-      return null;
-    }
-
-    const prices = data.results.map((item: Record<string, any>) => ({
-      date: new Date(item.t).toISOString(),
-      price: item.c,
-    }));
-    
-    // Cache the result
-    await cacheService.set(cacheKey, prices, CACHE_TTL.DAILY_PRICES);
-    
-    return prices;
-  } catch (error) {
-    console.error(`Error fetching enhanced daily prices for ${symbol}:`, error);
-    return null;
-  }
-}
-
-/**
- * Fetch weekly stock prices (1W) with enhanced caching
- */
-async function getEnhancedWeeklyPrices(symbol: string): Promise<{ date: string; price: number }[] | null> {
-  try {
-    // Check cache first
-    const cacheKey = `stock:enhanced:prices:weekly:${symbol}`;
-    const cachedData = await cacheService.get<{ date: string; price: number }[]>(cacheKey);
-    
-    if (cachedData) {
-      console.log(`Cache hit for enhanced weekly prices: ${symbol}`);
-      return cachedData;
-    }
-    
-    console.log(`Cache miss for enhanced weekly prices: ${symbol}, fetching from API`);
-    
-    const today = new Date();
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    
-    const formattedToday = today.toISOString().split('T')[0];
-    const formattedLastWeek = lastWeek.toISOString().split('T')[0];
-
-    const response = await fetch(
-      `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/hour/${formattedLastWeek}/${formattedToday}?apiKey=${POLYGON_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch weekly prices: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (!data.results) {
-      console.error('No results found for weekly prices:', data);
-      return null;
-    }
-
-    const prices = data.results.map((item: Record<string, any>) => ({
-      date: new Date(item.t).toISOString(),
-      price: item.c,
-    }));
-    
-    // Cache the result
-    await cacheService.set(cacheKey, prices, CACHE_TTL.WEEKLY_PRICES);
-    
-    return prices;
-  } catch (error) {
-    console.error(`Error fetching enhanced weekly prices for ${symbol}:`, error);
-    return null;
-  }
-}
-
-/**
- * Fetch monthly stock prices (1M) with enhanced caching
- */
-async function getEnhancedMonthlyPrices(symbol: string): Promise<{ date: string; price: number }[] | null> {
-  try {
-    // Check cache first
-    const cacheKey = `stock:enhanced:prices:monthly:${symbol}`;
-    const cachedData = await cacheService.get<{ date: string; price: number }[]>(cacheKey);
-    
-    if (cachedData) {
-      console.log(`Cache hit for enhanced monthly prices: ${symbol}`);
-      return cachedData;
-    }
-    
-    console.log(`Cache miss for enhanced monthly prices: ${symbol}, fetching from API`);
-    
-    const today = new Date();
-    const lastMonth = new Date(today);
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    
-    const formattedToday = today.toISOString().split('T')[0];
-    const formattedLastMonth = lastMonth.toISOString().split('T')[0];
-
-    const response = await fetch(
-      `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/day/${formattedLastMonth}/${formattedToday}?apiKey=${POLYGON_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch monthly prices: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (!data.results) {
-      console.error('No results found for monthly prices:', data);
-      return null;
-    }
-
-    const prices = data.results.map((item: Record<string, any>) => ({
-      date: new Date(item.t).toISOString(),
-      price: item.c,
-    }));
-    
-    // Cache the result
-    await cacheService.set(cacheKey, prices, CACHE_TTL.MONTHLY_PRICES);
-    
-    return prices;
-  } catch (error) {
-    console.error(`Error fetching enhanced monthly prices for ${symbol}:`, error);
-    return null;
-  }
-}
-
-/**
- * Fetch yearly stock prices (1Y) with enhanced caching
- */
-async function getEnhancedYearlyPrices(symbol: string): Promise<{ date: string; price: number }[] | null> {
-  try {
-    // Check cache first
-    const cacheKey = `stock:enhanced:prices:yearly:${symbol}`;
-    const cachedData = await cacheService.get<{ date: string; price: number }[]>(cacheKey);
-    
-    if (cachedData) {
-      console.log(`Cache hit for enhanced yearly prices: ${symbol}`);
-      return cachedData;
-    }
-    
-    console.log(`Cache miss for enhanced yearly prices: ${symbol}, fetching from API`);
-    
-    const today = new Date();
-    const lastYear = new Date(today);
-    lastYear.setFullYear(lastYear.getFullYear() - 1);
-    
-    const formattedToday = today.toISOString().split('T')[0];
-    const formattedLastYear = lastYear.toISOString().split('T')[0];
-
-    const response = await fetch(
-      `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/week/${formattedLastYear}/${formattedToday}?apiKey=${POLYGON_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch yearly prices: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (!data.results) {
-      console.error('No results found for yearly prices:', data);
-      return null;
-    }
-
-    const prices = data.results.map((item: Record<string, any>) => ({
-      date: new Date(item.t).toISOString(),
-      price: item.c,
-    }));
-    
-    // Cache the result
-    await cacheService.set(cacheKey, prices, CACHE_TTL.YEARLY_PRICES);
-    
-    return prices;
-  } catch (error) {
-    console.error(`Error fetching enhanced yearly prices for ${symbol}:`, error);
-    return null;
-  }
-}
-
-/**
- * Fetch 5-year stock prices with enhanced caching
- */
-async function getEnhanced5YearPrices(symbol: string): Promise<{ date: string; price: number }[] | null> {
-  try {
-    // Check cache first
-    const cacheKey = `stock:enhanced:prices:5year:${symbol}`;
-    const cachedData = await cacheService.get<{ date: string; price: number }[]>(cacheKey);
-    
-    if (cachedData) {
-      console.log(`Cache hit for enhanced 5-year prices: ${symbol}`);
-      return cachedData;
-    }
-    
-    console.log(`Cache miss for enhanced 5-year prices: ${symbol}, fetching from API`);
-    
-    const today = new Date();
-    const fiveYearsAgo = new Date(today);
-    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-    
-    const formattedToday = today.toISOString().split('T')[0];
-    const formattedFiveYearsAgo = fiveYearsAgo.toISOString().split('T')[0];
-
-    const response = await fetch(
-      `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/month/${formattedFiveYearsAgo}/${formattedToday}?apiKey=${POLYGON_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch 5-year prices: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (!data.results) {
-      console.error('No results found for 5-year prices:', data);
-      return null;
-    }
-
-    const prices = data.results.map((item: Record<string, any>) => ({
-      date: new Date(item.t).toISOString(),
-      price: item.c,
-    }));
-    
-    console.log(`Fetched ${prices.length} data points for 5-year prices for ${symbol}`);
-    
-    // Cache the result
-    await cacheService.set(cacheKey, prices, CACHE_TTL.YEARLY_PRICES);
-    
-    return prices;
-  } catch (error) {
-    console.error(`Error fetching enhanced 5-year prices for ${symbol}:`, error);
-    
-    // Generate mock data as fallback
-    console.log(`Generating mock 5-year data for ${symbol}`);
-    const mockPrices: { date: string; price: number }[] = [];
-    const now = new Date();
-    const basePrice = getRealisticBasePrice(symbol);
-    let currentPrice = basePrice * 0.6; // Start at 60% of current price 5 years ago
-    
-    // Generate monthly data points for 5 years (60 months)
-    for (let i = 60; i >= 0; i--) {
-      const date = new Date(now);
-      date.setMonth(date.getMonth() - i);
-      
-      // Add some randomness but with an upward trend
-      const volatility = 0.05; // 5% monthly volatility
-      const trend = 0.01; // 1% average monthly growth
-      const change = currentPrice * (trend + volatility * (Math.random() - 0.5));
-      currentPrice += change;
-      
-      mockPrices.push({
-        date: date.toISOString(),
-        price: currentPrice
-      });
-    }
-    
-    // Cache the mock result
-    await cacheService.set(`stock:enhanced:prices:5year:${symbol}`, mockPrices, CACHE_TTL.YEARLY_PRICES);
-    
-    return mockPrices;
-  }
-}
+};
 
 /**
  * Search for stocks with enhanced caching

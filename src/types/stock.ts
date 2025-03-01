@@ -18,6 +18,7 @@ export interface StockPrices {
   weekly: { date: string; price: number }[];
   monthly: { date: string; price: number }[];
   yearly: { date: string; price: number }[];
+  fiveYear: { date: string; price: number }[];
 }
 
 export type TimeRange = '1D' | '1W' | '1M' | '3M' | '1Y' | '5Y'; 

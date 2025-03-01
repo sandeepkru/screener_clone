@@ -38,13 +38,13 @@ export default async function StockPage({ params }: StockPageProps) {
     notFound();
   }
   
-  console.log(`Current stock data for ${symbol}:`, {
-    symbol: stock.symbol,
-    name: stock.name,
-    dailyPrices: prices?.daily.length || 0,
-    weeklyPrices: prices?.weekly.length || 0,
-    monthlyPrices: prices?.monthly.length || 0,
-    yearlyPrices: prices?.yearly.length || 0,
+  console.log('Stock data:', {
+    symbol: params.symbol,
+    dailyPrices: prices?.daily?.length || 0,
+    weeklyPrices: prices?.weekly?.length || 0,
+    monthlyPrices: prices?.monthly?.length || 0,
+    yearlyPrices: prices?.yearly?.length || 0,
+    fiveYearPrices: prices?.fiveYear?.length || 0
   });
   
   return (

@@ -26,8 +26,26 @@ export default function Home() {
       try {
         // Clear any existing cache for featured stocks to ensure fresh data
         featuredSymbols.forEach(symbol => {
-          const cacheKey = `stock:data:${symbol}`;
-          localStorage.removeItem(cacheKey);
+          // Clear all cache keys related to this symbol
+          const cacheKeys = [
+            `stock:data:${symbol}`,
+            `stock:prices:${symbol}:1D`,
+            `stock:prices:${symbol}:1W`,
+            `stock:prices:${symbol}:1M`,
+            `stock:prices:${symbol}:3M`,
+            `stock:prices:${symbol}:1Y`,
+            `stock:prices:${symbol}:5Y`,
+            `stock:enhanced:prices:daily:${symbol}`,
+            `stock:enhanced:prices:weekly:${symbol}`,
+            `stock:enhanced:prices:monthly:${symbol}`,
+            `stock:enhanced:prices:yearly:${symbol}`,
+            `stock:enhanced:prices:5year:${symbol}`
+          ];
+          
+          cacheKeys.forEach(key => {
+            localStorage.removeItem(key);
+            console.log(`Cleared cache for ${key}`);
+          });
         });
         
         const stocksData = await Promise.all(

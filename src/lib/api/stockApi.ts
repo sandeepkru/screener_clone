@@ -296,9 +296,9 @@ export const getStockPriceData = async (
                   timeRange === '1W' ? 7 : 
                   timeRange === '1M' ? 30 : 
                   timeRange === '3M' ? 90 : 
-                  timeRange === '1Y' ? 365 : 1825;
+                  timeRange === '1Y' ? 365 : 1825; // 5 years = 1825 days
       
-      const basePrice = 100 + Math.random() * 900; // Random price between 100 and 1000
+      const basePrice = getRealisticBasePrice(symbol);
       const mockPrices = generateMockPrices(days, basePrice);
       console.log(`Generated ${mockPrices.length} mock price points for ${symbol} (${timeRange})`);
       
@@ -321,9 +321,9 @@ export const getStockPriceData = async (
                 timeRange === '1W' ? 7 : 
                 timeRange === '1M' ? 30 : 
                 timeRange === '3M' ? 90 : 
-                timeRange === '1Y' ? 365 : 1825;
+                timeRange === '1Y' ? 365 : 1825; // 5 years = 1825 days
     
-    const basePrice = 100 + Math.random() * 900; // Random price between 100 and 1000
+    const basePrice = getRealisticBasePrice(symbol);
     const prices = generateMockPrices(days, basePrice);
     console.log(`Generated ${prices.length} mock price points for ${symbol} (${timeRange}) after error`);
     
@@ -339,6 +339,21 @@ export const getStockPriceData = async (
     return { success: true, data: prices };
   }
 };
+
+// Helper function to get realistic base price for a stock
+function getRealisticBasePrice(symbol: string): number {
+  switch (symbol.toUpperCase()) {
+    case 'AAPL': return 180 + Math.random() * 20; // Around $180-$200
+    case 'MSFT': return 380 + Math.random() * 40; // Around $380-$420
+    case 'GOOGL': return 160 + Math.random() * 20; // Around $160-$180
+    case 'AMZN': return 170 + Math.random() * 20; // Around $170-$190
+    case 'META': return 480 + Math.random() * 40; // Around $480-$520
+    case 'TSLA': return 220 + Math.random() * 30; // Around $220-$250
+    case 'NVDA': return 900 + Math.random() * 100; // Around $900-$1000
+    case 'NFLX': return 600 + Math.random() * 50; // Around $600-$650
+    default: return 100 + Math.random() * 900; // Random price between $100 and $1000
+  }
+}
 
 // Get all stock data for a symbol
 export const getStockData = async (symbol: string): Promise<ApiResponse<StockData>> => {
@@ -507,12 +522,13 @@ export async function getEnhancedStockPrices(symbol: string): Promise<StockPrice
     const weeklyPrices = await getEnhancedWeeklyPrices(symbol);
     const monthlyPrices = await getEnhancedMonthlyPrices(symbol);
     const yearlyPrices = await getEnhancedYearlyPrices(symbol);
+    const fiveYearPrices = await getEnhanced5YearPrices(symbol);
 
     return {
       daily: dailyPrices || [],
       weekly: weeklyPrices || [],
       monthly: monthlyPrices || [],
-      yearly: yearlyPrices || [],
+      yearly: fiveYearPrices || yearlyPrices || [], // Use 5-year data if available, otherwise fall back to 1-year
     };
   } catch (error) {
     console.error(`Error fetching enhanced stock prices for ${symbol}:`, error);
@@ -729,6 +745,89 @@ async function getEnhancedYearlyPrices(symbol: string): Promise<{ date: string; 
   } catch (error) {
     console.error(`Error fetching enhanced yearly prices for ${symbol}:`, error);
     return null;
+  }
+}
+
+/**
+ * Fetch 5-year stock prices with enhanced caching
+ */
+async function getEnhanced5YearPrices(symbol: string): Promise<{ date: string; price: number }[] | null> {
+  try {
+    // Check cache first
+    const cacheKey = `stock:enhanced:prices:5year:${symbol}`;
+    const cachedData = await cacheService.get<{ date: string; price: number }[]>(cacheKey);
+    
+    if (cachedData) {
+      console.log(`Cache hit for enhanced 5-year prices: ${symbol}`);
+      return cachedData;
+    }
+    
+    console.log(`Cache miss for enhanced 5-year prices: ${symbol}, fetching from API`);
+    
+    const today = new Date();
+    const fiveYearsAgo = new Date(today);
+    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+    
+    const formattedToday = today.toISOString().split('T')[0];
+    const formattedFiveYearsAgo = fiveYearsAgo.toISOString().split('T')[0];
+
+    const response = await fetch(
+      `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/month/${formattedFiveYearsAgo}/${formattedToday}?apiKey=${POLYGON_API_KEY}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch 5-year prices: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.results) {
+      console.error('No results found for 5-year prices:', data);
+      return null;
+    }
+
+    const prices = data.results.map((item: Record<string, any>) => ({
+      date: new Date(item.t).toISOString(),
+      price: item.c,
+    }));
+    
+    console.log(`Fetched ${prices.length} data points for 5-year prices for ${symbol}`);
+    
+    // Cache the result
+    await cacheService.set(cacheKey, prices, CACHE_TTL.YEARLY_PRICES);
+    
+    return prices;
+  } catch (error) {
+    console.error(`Error fetching enhanced 5-year prices for ${symbol}:`, error);
+    
+    // Generate mock data as fallback
+    console.log(`Generating mock 5-year data for ${symbol}`);
+    const mockPrices: { date: string; price: number }[] = [];
+    const now = new Date();
+    const basePrice = getRealisticBasePrice(symbol);
+    let currentPrice = basePrice * 0.6; // Start at 60% of current price 5 years ago
+    
+    // Generate monthly data points for 5 years (60 months)
+    for (let i = 60; i >= 0; i--) {
+      const date = new Date(now);
+      date.setMonth(date.getMonth() - i);
+      
+      // Add some randomness but with an upward trend
+      const volatility = 0.05; // 5% monthly volatility
+      const trend = 0.01; // 1% average monthly growth
+      const change = currentPrice * (trend + volatility * (Math.random() - 0.5));
+      currentPrice += change;
+      
+      mockPrices.push({
+        date: date.toISOString(),
+        price: currentPrice
+      });
+    }
+    
+    // Cache the mock result
+    await cacheService.set(`stock:enhanced:prices:5year:${symbol}`, mockPrices, CACHE_TTL.YEARLY_PRICES);
+    
+    return mockPrices;
   }
 }
 

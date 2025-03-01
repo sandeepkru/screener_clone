@@ -6,6 +6,27 @@ interface StockInfoProps {
 }
 
 export default function StockInfo({ stock }: StockInfoProps) {
+  // Ensure stock is valid
+  if (!stock) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold mb-4">Company Information</h2>
+        <p className="text-sm text-gray-500">No company information available.</p>
+      </div>
+    );
+  }
+
+  // Format IPO date safely
+  let formattedIpoDate = null;
+  if (stock.ipo_date) {
+    try {
+      formattedIpoDate = new Date(stock.ipo_date).toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting IPO date:', error);
+      formattedIpoDate = stock.ipo_date;
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold mb-4">Company Information</h2>
@@ -18,13 +39,13 @@ export default function StockInfo({ stock }: StockInfoProps) {
       )}
       
       <div className="space-y-4">
-        <InfoItem label="Market Cap" value={formatCurrency(stock.market_cap)} />
+        <InfoItem label="Market Cap" value={formatCurrency(stock.market_cap || 0)} />
         {stock.industry && <InfoItem label="Industry" value={stock.industry} />}
         {stock.exchange && <InfoItem label="Exchange" value={stock.exchange} />}
         {stock.employees > 0 && <InfoItem label="Employees" value={formatNumber(stock.employees)} />}
         {stock.ceo && <InfoItem label="CEO" value={stock.ceo} />}
         {stock.country && <InfoItem label="Country" value={stock.country} />}
-        {stock.ipo_date && <InfoItem label="IPO Date" value={new Date(stock.ipo_date).toLocaleDateString()} />}
+        {formattedIpoDate && <InfoItem label="IPO Date" value={formattedIpoDate} />}
       </div>
       
       {stock.website && (

@@ -1,101 +1,266 @@
-import Image from "next/image";
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { searchCompanies, getStockData } from '@/lib/api/stockApi';
+import { Company, StockData } from '@/types';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [featuredStocks, setFeaturedStocks] = useState<{
+    symbol: string;
+    name: string;
+    price: number;
+    change: number;
+    percentChange: number;
+  }[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Featured stock symbols
+  const featuredSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN'];
+  
+  useEffect(() => {
+    const fetchFeaturedStocks = async () => {
+      setIsLoading(true);
+      try {
+        const stocksData = await Promise.all(
+          featuredSymbols.map(async (symbol) => {
+            try {
+              const response = await getStockData(symbol);
+              
+              if (response.success && response.data) {
+                const stockData = response.data;
+                const prices = stockData.dailyPrices;
+                
+                if (prices.length >= 2) {
+                  const latestPrice = prices[prices.length - 1].close;
+                  const previousPrice = prices[0].close;
+                  const priceChange = latestPrice - previousPrice;
+                  const percentChange = (priceChange / previousPrice) * 100;
+                  
+                  return {
+                    symbol: stockData.company.symbol,
+                    name: stockData.company.name,
+                    price: latestPrice,
+                    change: priceChange,
+                    percentChange: percentChange
+                  };
+                }
+              }
+              
+              // If API call fails or doesn't return expected data, return null
+              return null;
+            } catch (error) {
+              console.error(`Error fetching data for ${symbol}:`, error);
+              return null;
+            }
+          })
+        );
+        
+        // Filter out any null values and use mock data for missing stocks
+        const validStocks = stocksData.filter(stock => stock !== null) as {
+          symbol: string;
+          name: string;
+          price: number;
+          change: number;
+          percentChange: number;
+        }[];
+        
+        const fetchedSymbols = validStocks.map(stock => stock.symbol);
+        const missingSymbols = featuredSymbols.filter(symbol => !fetchedSymbols.includes(symbol));
+        
+        // Add mock data for missing stocks
+        if (missingSymbols.length > 0) {
+          const mockData = [
+            { symbol: 'AAPL', name: 'Apple Inc.', price: 241.84, change: 3.61, percentChange: 1.52 },
+            { symbol: 'MSFT', name: 'Microsoft Corporation', price: 420.35, change: 5.2, percentChange: 1.25 },
+            { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 175.98, change: -1.8, percentChange: -1.01 },
+            { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 178.75, change: 0.89, percentChange: 0.5 },
+          ];
+          
+          const missingStocks = mockData.filter(stock => missingSymbols.includes(stock.symbol));
+          setFeaturedStocks([...validStocks, ...missingStocks]);
+        } else {
+          setFeaturedStocks(validStocks);
+        }
+      } catch (error) {
+        console.error('Error fetching featured stocks:', error);
+        // Fallback to mock data on error
+        setFeaturedStocks([
+          { symbol: 'AAPL', name: 'Apple Inc.', price: 241.84, change: 3.61, percentChange: 1.52 },
+          { symbol: 'MSFT', name: 'Microsoft Corporation', price: 420.35, change: 5.2, percentChange: 1.25 },
+          { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 175.98, change: -1.8, percentChange: -1.01 },
+          { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 178.75, change: 0.89, percentChange: 0.5 },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchFeaturedStocks();
+  }, []);
+  
+  return (
+    <div className="flex flex-col min-h-screen">
+      {/* Hero Section */}
+      <section className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6">
+              Stock Analysis and Screening Tool for Investors in India
+            </h1>
+            <p className="text-xl mb-8">
+              Research stocks, analyze financial data, and make informed investment decisions with our powerful screening tools.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <Button size="lg" asChild>
+                <Link href="/register">Get Started for Free</Link>
+              </Button>
+              <Button size="lg" variant="outline" className="bg-white/10" asChild>
+                <Link href="/features">Explore Features</Link>
+              </Button>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </section>
+      
+      {/* Featured Stocks */}
+      <section className="py-16 bg-gray-50 dark:bg-gray-900">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12">Featured Stocks</h2>
+          
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featuredStocks.map((stock) => (
+                <Link key={stock.symbol} href={`/stock/${stock.symbol}`}>
+                  <Card className="h-full hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-lg font-bold">{stock.symbol}</h3>
+                          <p className="text-sm text-gray-500">{stock.name}</p>
+                        </div>
+                        <div className={`text-right ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          <p className="text-lg font-bold">
+                            ${stock.price.toFixed(2)}
+                          </p>
+                          <p className="text-sm">
+                            {stock.change >= 0 ? '+' : ''}
+                            {stock.change.toFixed(2)} ({stock.change >= 0 ? '+' : ''}
+                            {stock.percentChange.toFixed(2)}%)
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline" className="w-full">View Details</Button>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+      
+      {/* Features Section */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12">Why Choose StockScreener</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center p-6">
+              <div className="bg-blue-100 dark:bg-blue-900 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-8 h-8 text-blue-600 dark:text-blue-300"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-2">Real-Time Data</h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Access real-time stock prices, financial data, and market insights to make timely investment decisions.
+              </p>
+            </div>
+            
+            <div className="text-center p-6">
+              <div className="bg-blue-100 dark:bg-blue-900 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-8 h-8 text-blue-600 dark:text-blue-300"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-2">Advanced Screening</h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Filter stocks based on financial metrics, technical indicators, and custom criteria to find the best investment opportunities.
+              </p>
+            </div>
+            
+            <div className="text-center p-6">
+              <div className="bg-blue-100 dark:bg-blue-900 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-8 h-8 text-blue-600 dark:text-blue-300"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-2">Portfolio Tracking</h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Track your investments, monitor performance, and get insights to optimize your portfolio for better returns.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      {/* CTA Section */}
+      <section className="bg-blue-600 text-white py-16">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold mb-6">Ready to Start Investing Smarter?</h2>
+          <p className="text-xl mb-8 max-w-2xl mx-auto">
+            Join thousands of investors who use StockScreener to research, analyze, and make better investment decisions.
+          </p>
+          <Button size="lg" variant="outline" className="bg-white text-blue-600 hover:bg-blue-50" asChild>
+            <Link href="/register">Create Free Account</Link>
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

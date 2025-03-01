@@ -24,6 +24,7 @@ export interface StockPrices {
   daily: { date: string; price: number }[];
   weekly: { date: string; price: number }[];
   monthly: { date: string; price: number }[];
+  threeMonth: { date: string; price: number }[];
   yearly: { date: string; price: number }[];
   fiveYear: { date: string; price: number }[];
 }
@@ -483,30 +484,35 @@ export const getEnhancedStockPrices = async (symbol: string): Promise<StockPrice
     const dailyPrices = await getStockPriceData(symbol, '1D');
     const weeklyPrices = await getStockPriceData(symbol, '1W');
     const monthlyPrices = await getStockPriceData(symbol, '1M');
+    const threeMonthPrices = await getStockPriceData(symbol, '3M');
     const yearlyPrices = await getStockPriceData(symbol, '1Y');
     const fiveYearPrices = await getStockPriceData(symbol, '5Y');
     
     return {
-      daily: dailyPrices.data.map(price => ({
+      daily: dailyPrices.data?.map(price => ({
         date: new Date(price.timestamp).toISOString(),
         price: price.close
-      })),
-      weekly: weeklyPrices.data.map(price => ({
+      })) || [],
+      weekly: weeklyPrices.data?.map(price => ({
         date: new Date(price.timestamp).toISOString(),
         price: price.close
-      })),
-      monthly: monthlyPrices.data.map(price => ({
+      })) || [],
+      monthly: monthlyPrices.data?.map(price => ({
         date: new Date(price.timestamp).toISOString(),
         price: price.close
-      })),
-      yearly: yearlyPrices.data.map(price => ({
+      })) || [],
+      threeMonth: threeMonthPrices.data?.map(price => ({
         date: new Date(price.timestamp).toISOString(),
         price: price.close
-      })),
-      fiveYear: fiveYearPrices.data.map(price => ({
+      })) || [],
+      yearly: yearlyPrices.data?.map(price => ({
         date: new Date(price.timestamp).toISOString(),
         price: price.close
-      }))
+      })) || [],
+      fiveYear: fiveYearPrices.data?.map(price => ({
+        date: new Date(price.timestamp).toISOString(),
+        price: price.close
+      })) || []
     };
   } catch (error) {
     console.error(`Error fetching enhanced stock prices for ${symbol}:`, error);

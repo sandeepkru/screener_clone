@@ -43,6 +43,7 @@ export default async function StockPage({ params }: StockPageProps) {
     dailyPrices: prices?.daily?.length || 0,
     weeklyPrices: prices?.weekly?.length || 0,
     monthlyPrices: prices?.monthly?.length || 0,
+    threeMonthPrices: prices?.threeMonth?.length || 0,
     yearlyPrices: prices?.yearly?.length || 0,
     fiveYearPrices: prices?.fiveYear?.length || 0
   });

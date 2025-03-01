@@ -17,6 +17,7 @@ export interface StockPrices {
   daily: { date: string; price: number }[];
   weekly: { date: string; price: number }[];
   monthly: { date: string; price: number }[];
+  threeMonth: { date: string; price: number }[];
   yearly: { date: string; price: number }[];
   fiveYear: { date: string; price: number }[];
 }

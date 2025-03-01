@@ -33,7 +33,7 @@ export default function StockChart({ symbol, name, prices }: StockChartProps) {
       case '1M':
         return prices.monthly || [];
       case '3M':
-        return prices.monthly || [];
+        return prices.threeMonth || [];
       case '1Y':
         return prices.yearly || [];
       case '5Y':

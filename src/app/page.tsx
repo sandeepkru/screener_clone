@@ -33,33 +33,50 @@ export default function Home() {
                 const stockData = response.data;
                 const prices = stockData.dailyPrices;
                 
-                if (prices.length >= 2) {
+                if (prices && prices.length >= 2) {
                   const latestPrice = prices[prices.length - 1].close;
                   const previousPrice = prices[0].close;
-                  const priceChange = latestPrice - previousPrice;
-                  const percentChange = (priceChange / previousPrice) * 100;
                   
-                  return {
-                    symbol: stockData.company.symbol,
-                    name: stockData.company.name,
-                    price: latestPrice,
-                    change: priceChange,
-                    percentChange: percentChange
-                  };
+                  // Ensure we have valid numeric values
+                  if (typeof latestPrice === 'number' && typeof previousPrice === 'number') {
+                    const priceChange = latestPrice - previousPrice;
+                    const percentChange = (priceChange / previousPrice) * 100;
+                    
+                    return {
+                      symbol: stockData.company.symbol,
+                      name: stockData.company.name,
+                      price: latestPrice,
+                      change: priceChange,
+                      percentChange: percentChange
+                    };
+                  }
                 }
               }
               
-              // If API call fails or doesn't return expected data, return null
-              return null;
+              // If we don't have valid price data, return a stock object with default values
+              return {
+                symbol: symbol,
+                name: getMockCompanyName(symbol),
+                price: 100.00, // Default price
+                change: 0.00,
+                percentChange: 0.00
+              };
             } catch (error) {
               console.error(`Error fetching data for ${symbol}:`, error);
-              return null;
+              // Return a default stock object instead of null
+              return {
+                symbol: symbol,
+                name: getMockCompanyName(symbol),
+                price: 100.00, // Default price
+                change: 0.00,
+                percentChange: 0.00
+              };
             }
           })
         );
         
-        // Filter out any null values and use mock data for missing stocks
-        const validStocks = stocksData.filter(stock => stock !== null) as {
+        // No need to filter out null values since we're always returning valid stock objects
+        const validStocks = stocksData as {
           symbol: string;
           name: string;
           price: number;
@@ -67,23 +84,7 @@ export default function Home() {
           percentChange: number;
         }[];
         
-        const fetchedSymbols = validStocks.map(stock => stock.symbol);
-        const missingSymbols = featuredSymbols.filter(symbol => !fetchedSymbols.includes(symbol));
-        
-        // Add mock data for missing stocks
-        if (missingSymbols.length > 0) {
-          const mockData = [
-            { symbol: 'AAPL', name: 'Apple Inc.', price: 241.84, change: 3.61, percentChange: 1.52 },
-            { symbol: 'MSFT', name: 'Microsoft Corporation', price: 420.35, change: 5.2, percentChange: 1.25 },
-            { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 175.98, change: -1.8, percentChange: -1.01 },
-            { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 178.75, change: 0.89, percentChange: 0.5 },
-          ];
-          
-          const missingStocks = mockData.filter(stock => missingSymbols.includes(stock.symbol));
-          setFeaturedStocks([...validStocks, ...missingStocks]);
-        } else {
-          setFeaturedStocks(validStocks);
-        }
+        setFeaturedStocks(validStocks);
       } catch (error) {
         console.error('Error fetching featured stocks:', error);
         // Fallback to mock data on error
@@ -147,12 +148,12 @@ export default function Home() {
                         </div>
                         <div className={`text-right ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           <p className="text-lg font-bold">
-                            ${stock.price.toFixed(2)}
+                            ${(stock.price !== undefined && stock.price !== null) ? stock.price.toFixed(2) : '0.00'}
                           </p>
                           <p className="text-sm">
                             {stock.change >= 0 ? '+' : ''}
-                            {stock.change.toFixed(2)} ({stock.change >= 0 ? '+' : ''}
-                            {stock.percentChange.toFixed(2)}%)
+                            {(stock.change !== undefined && stock.change !== null) ? stock.change.toFixed(2) : '0.00'} ({stock.change >= 0 ? '+' : ''}
+                            {(stock.percentChange !== undefined && stock.percentChange !== null) ? stock.percentChange.toFixed(2) : '0.00'}%)
                           </p>
                         </div>
                       </div>
@@ -264,3 +265,14 @@ export default function Home() {
     </div>
   );
 }
+
+// Helper function to get mock company name
+const getMockCompanyName = (symbol: string): string => {
+  switch (symbol) {
+    case 'AAPL': return 'Apple Inc.';
+    case 'MSFT': return 'Microsoft Corporation';
+    case 'GOOGL': return 'Alphabet Inc.';
+    case 'AMZN': return 'Amazon.com Inc.';
+    default: return `${symbol} Inc.`;
+  }
+};

@@ -1,5 +1,7 @@
 # StockScreener
 
+> **Note:** This project was 100% generated using [Cursor IDE](https://cursor.sh/) Agent Mode. The entire codebase, including all components, styling, and functionality, was created through AI pair programming.
+
 A modern stock analysis and screening tool for investors, similar to Screener.in. This application allows users to search for stocks, view interactive charts with different time ranges, and access detailed company information.
 
 ## Screenshots

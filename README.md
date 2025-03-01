@@ -38,6 +38,10 @@ A modern stock analysis and screening tool for investors, similar to Screener.in
   - AWS S3 for cache snapshot storage
   - Local filesystem fallback for development
 
+- **CI/CD**:
+  - GitHub Actions for continuous integration and deployment
+  - Vercel for hosting and production deployment
+
 ## Getting Started
 
 ### Prerequisites
@@ -156,3 +160,29 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - [Polygon.io](https://polygon.io/) for providing stock market data API
 - [Screener.in](https://www.screener.in/) for inspiration
+
+## CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and deployment to Vercel:
+
+### Continuous Integration
+
+On every push to the `main` branch and pull requests:
+- Code is checked out
+- Dependencies are installed
+- Application is built to ensure no build errors
+
+### Continuous Deployment
+
+On every push to the `main` branch:
+- Code is automatically deployed to Vercel
+- Environment variables are securely passed from GitHub Secrets
+
+### Setting Up Vercel Deployment
+
+1. Create a Vercel account and link your GitHub repository
+2. Generate a Vercel token from your account settings
+3. Add the following secrets to your GitHub repository:
+   - `VERCEL_TOKEN`: Your Vercel API token
+   - `NEXT_PUBLIC_POLYGON_API_KEY`: Your Polygon.io API key
+   - `NEXT_PUBLIC_API_BASE_URL`: The Polygon.io API base URL

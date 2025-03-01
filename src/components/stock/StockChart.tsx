@@ -1,62 +1,56 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import {
+import { useState } from 'react';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
   ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
+  ReferenceLine
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { StockPrice, TimeRange } from '@/types';
-import { useStockStore } from '@/store/stockStore';
+import { StockPrices, TimeRange } from '@/types/stock';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/formatters';
 
 interface StockChartProps {
-  prices: StockPrice[];
   symbol: string;
+  name: string;
+  prices: StockPrices;
 }
 
-export const StockChart: React.FC<StockChartProps> = ({ prices, symbol }) => {
-  const { selectedTimeRange, setTimeRange } = useStockStore();
+export default function StockChart({ symbol, name, prices }: StockChartProps) {
+  const [timeRange, setTimeRange] = useState<TimeRange>('1D');
   
-  // Debug: Log the prices data
-  useEffect(() => {
-    console.log('StockChart prices:', prices);
-    console.log('StockChart symbol:', symbol);
-    console.log('StockChart selectedTimeRange:', selectedTimeRange);
-  }, [prices, symbol, selectedTimeRange]);
+  // Get the appropriate price data based on the selected time range
+  const getPriceData = () => {
+    switch (timeRange) {
+      case '1D':
+        return prices.daily;
+      case '1W':
+        return prices.weekly;
+      case '1M':
+      case '3M':
+        return prices.monthly;
+      case '1Y':
+      case '5Y':
+        return prices.yearly;
+      default:
+        return prices.daily;
+    }
+  };
   
-  // Format data for the chart
-  const chartData = prices && prices.length > 0 ? prices.map((price) => {
-    const date = new Date(price.timestamp);
-    
-    return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString(),
-      price: price.close,
-      open: price.open,
-      high: price.high,
-      low: price.low,
-      volume: price.volume,
-    };
-  }) : [];
-  
-  // Debug: Log the formatted chart data
-  useEffect(() => {
-    console.log('StockChart chartData:', chartData);
-  }, [chartData]);
+  const priceData = getPriceData();
   
   // Calculate price change
   const calculatePriceChange = () => {
-    if (!prices || prices.length < 2) return { change: 0, percentChange: 0 };
+    if (!priceData || priceData.length < 2) {
+      return { change: 0, percentChange: 0 };
+    }
     
-    const firstPrice = prices[0].close;
-    const lastPrice = prices[prices.length - 1].close;
+    const firstPrice = priceData[0].price;
+    const lastPrice = priceData[priceData.length - 1].price;
     const change = lastPrice - firstPrice;
     const percentChange = (change / firstPrice) * 100;
     
@@ -66,25 +60,28 @@ export const StockChart: React.FC<StockChartProps> = ({ prices, symbol }) => {
   const { change, percentChange } = calculatePriceChange();
   const isPositive = change >= 0;
   
-  // Format price for display
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
+  // Format the date for the tooltip based on the time range
+  const formatTooltipDate = (date: string) => {
+    const dateObj = new Date(date);
+    
+    if (timeRange === '1D') {
+      return formatDateTime(dateObj);
+    } else {
+      return formatDate(dateObj);
+    }
   };
   
-  // Custom tooltip for the chart
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 border rounded shadow-lg">
-          <p className="text-gray-500">{`${label} ${payload[0].payload.time}`}</p>
-          <p className="font-bold">{`Price: ${formatPrice(payload[0].value)}`}</p>
-          <p>{`Open: ${formatPrice(payload[0].payload.open)}`}</p>
-          <p>{`High: ${formatPrice(payload[0].payload.high)}`}</p>
-          <p>{`Low: ${formatPrice(payload[0].payload.low)}`}</p>
-          <p>{`Volume: ${payload[0].payload.volume.toLocaleString()}`}</p>
+        <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded shadow-lg">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {formatTooltipDate(payload[0].payload.date)}
+          </p>
+          <p className="text-sm font-semibold">
+            {formatCurrency(payload[0].value)}
+          </p>
         </div>
       );
     }
@@ -92,121 +89,81 @@ export const StockChart: React.FC<StockChartProps> = ({ prices, symbol }) => {
     return null;
   };
   
-  // Time range options
-  const timeRanges: { value: TimeRange; label: string }[] = [
-    { value: '1D', label: '1D' },
-    { value: '1W', label: '1W' },
-    { value: '1M', label: '1M' },
-    { value: '3M', label: '3M' },
-    { value: '1Y', label: '1Y' },
-    { value: '5Y', label: '5Y' },
-  ];
-  
-  // If no prices data, show a loading state
-  if (!prices || prices.length === 0) {
-    return (
-      <Card className="w-full">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle>{symbol} Stock Price</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="h-[400px] flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent mx-auto mb-4"></div>
-            <p>Loading chart data...</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle>{symbol} Stock Price</CardTitle>
-          <div className="text-right">
-            <div className="text-2xl font-bold">
-              {formatPrice(prices[prices.length - 1]?.close || 0)}
-            </div>
-            <div
-              className={`text-sm ${
-                isPositive ? 'text-green-500' : 'text-red-500'
-              }`}
-            >
-              {isPositive ? '+' : ''}
-              {formatPrice(change)} ({isPositive ? '+' : ''}
-              {percentChange.toFixed(2)}%)
-            </div>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold">{formatCurrency(priceData[priceData.length - 1]?.price || 0)}</h2>
+          <div className={`flex items-center ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+            <span className="font-medium">
+              {isPositive ? '+' : ''}{formatCurrency(change)}
+            </span>
+            <span className="ml-2">
+              ({isPositive ? '+' : ''}{percentChange.toFixed(2)}%)
+            </span>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs
-          defaultValue={selectedTimeRange}
-          value={selectedTimeRange}
-          onValueChange={(value) => setTimeRange(value as TimeRange)}
-          className="w-full"
-        >
-          <TabsList className="mb-4">
-            {timeRanges.map((range) => (
-              <TabsTrigger key={range.value} value={range.value}>
-                {range.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          
-          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor={isPositive ? '#10b981' : '#ef4444'}
-                      stopOpacity={0.8}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={isPositive ? '#10b981' : '#ef4444'}
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(value) => {
-                    // Format based on time range
-                    if (selectedTimeRange === '1D') {
-                      return chartData.find((d) => d.date === value)?.time.substring(0, 5) || '';
-                    }
-                    return value;
-                  }}
-                />
-                <YAxis
-                  domain={['dataMin', 'dataMax']}
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(value) => formatPrice(value)}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="price"
-                  stroke={isPositive ? '#10b981' : '#ef4444'}
-                  fillOpacity={1}
-                  fill="url(#colorPrice)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Tabs>
-      </CardContent>
-    </Card>
+        
+        <div className="flex space-x-2">
+          {(['1D', '1W', '1M', '3M', '1Y', '5Y'] as TimeRange[]).map((range) => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={`px-3 py-1 text-sm rounded-md ${
+                timeRange === range
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              {range}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      <div className="h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={priceData}
+            margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+            <XAxis 
+              dataKey="date" 
+              tickFormatter={(date) => {
+                const dateObj = new Date(date);
+                if (timeRange === '1D') {
+                  return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else if (timeRange === '1W') {
+                  return dateObj.toLocaleDateString([], { weekday: 'short' });
+                } else {
+                  return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                }
+              }}
+              tick={{ fontSize: 12 }}
+              axisLine={{ stroke: '#374151', opacity: 0.3 }}
+              tickLine={{ stroke: '#374151', opacity: 0.3 }}
+            />
+            <YAxis 
+              domain={['auto', 'auto']}
+              tickFormatter={(value) => formatCurrency(value).replace('.00', '')}
+              tick={{ fontSize: 12 }}
+              axisLine={{ stroke: '#374151', opacity: 0.3 }}
+              tickLine={{ stroke: '#374151', opacity: 0.3 }}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <ReferenceLine y={priceData[0]?.price} stroke="#374151" strokeDasharray="3 3" />
+            <Line
+              type="monotone"
+              dataKey="price"
+              stroke={isPositive ? '#10B981' : '#EF4444'}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
-}; 
+} 

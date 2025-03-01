@@ -18,6 +18,8 @@ A modern stock analysis and screening tool for investors, similar to Screener.in
 - **Interactive Charts**: View stock price charts with multiple time ranges (1D, 1W, 1M, 3M, 1Y, 5Y)
 - **Company Information**: Access detailed company data including description, sector, market cap, etc.
 - **Responsive Design**: Fully responsive UI that works on desktop and mobile devices
+- **Redis Caching**: Efficient caching system to reduce API calls and improve performance
+- **S3 Backup**: Periodic snapshots of cache data to S3 for persistence and recovery
 
 ## Tech Stack
 
@@ -31,11 +33,18 @@ A modern stock analysis and screening tool for investors, similar to Screener.in
 - **API Integration**:
   - Polygon.io API for stock data (with fallback to mock data)
 
+- **Caching & Storage**:
+  - Redis for high-performance caching
+  - AWS S3 for cache snapshot storage
+  - Local filesystem fallback for development
+
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ and npm
+- Redis server (local or remote)
+- AWS account with S3 access (optional)
 
 ### Installation
 
@@ -52,19 +61,62 @@ A modern stock analysis and screening tool for investors, similar to Screener.in
 
 3. Create a `.env.local` file in the root directory with the following variables:
    ```
+   # API Configuration
    NEXT_PUBLIC_POLYGON_API_KEY=your_polygon_api_key
    NEXT_PUBLIC_API_BASE_URL=https://api.polygon.io
+   
+   # App Configuration
    NEXT_PUBLIC_APP_NAME=StockScreener
-   NEXT_PUBLIC_APP_DESCRIPTION=Stock analysis and screening tool for investors in India.
+   NEXT_PUBLIC_APP_DESCRIPTION=Stock analysis and screening tool for investors.
    NEXT_PUBLIC_APP_URL=http://localhost:3000
+   
+   # Redis Cache Configuration
+   REDIS_URL=redis://localhost:6379
+   CACHE_TTL=86400
+   SNAPSHOT_INTERVAL=0 0 * * *
+   LOCAL_SNAPSHOT_DIR=/tmp/stockscreener-cache
+   
+   # AWS S3 Configuration (Optional)
+   # S3_BUCKET=your-bucket-name
+   # S3_REGION=us-east-1
+   # AWS_ACCESS_KEY_ID=your_aws_access_key
+   # AWS_SECRET_ACCESS_KEY=your_aws_secret_key
    ```
 
-4. Start the development server:
+4. Start Redis server (if using local Redis):
+   ```bash
+   # Using Docker
+   docker run -d -p 6379:6379 --name stockscreener-redis redis
+   
+   # Or use your system's Redis service
+   ```
+
+5. Start the development server:
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+6. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+
+## Caching System
+
+The application uses a sophisticated caching system to improve performance and reduce API calls:
+
+- **Redis Cache**: All stock data is cached in Redis with appropriate TTLs based on data type
+- **Automatic Snapshots**: Cache data is automatically saved to the filesystem or S3 at configured intervals
+- **Cache Recovery**: On startup, the application loads the latest cache snapshot to warm the cache
+- **Fallback Mechanism**: If Redis is unavailable, the application falls back to API calls
+
+### Cache Configuration
+
+You can configure the caching behavior through environment variables:
+
+- `REDIS_URL`: Connection string for Redis server
+- `CACHE_TTL`: Default TTL for cached items in seconds
+- `SNAPSHOT_INTERVAL`: Cron expression for snapshot schedule
+- `LOCAL_SNAPSHOT_DIR`: Directory for local cache snapshots
+- `S3_BUCKET`: S3 bucket for cache snapshots (optional)
+- `S3_REGION`: AWS region for S3 bucket (optional)
 
 ## Project Structure
 
@@ -76,6 +128,7 @@ src/
 │   └── ui/               # UI components (ShadCN)
 ├── lib/                  # Utility functions and API clients
 │   ├── api/              # API service functions
+│   ├── cache/            # Redis caching system
 │   └── utils/            # Helper utilities
 ├── store/                # Zustand state management
 └── types/                # TypeScript type definitions
@@ -85,10 +138,11 @@ src/
 
 - Backend implementation with FastAPI
 - PostgreSQL with TimescaleDB for time-series data
-- Redis for caching
 - User authentication and portfolio tracking
 - Advanced stock screening with custom filters
 - Fundamental analysis tools
+- Distributed caching with Redis Cluster
+- Real-time data with WebSockets
 
 ## Contributing
 

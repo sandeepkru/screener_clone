@@ -5,7 +5,47 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getStockData } from '@/lib/api/stockApi';
-import { Company, StockData } from '@/types';
+
+// Mock data functions
+function getMockCompanyName(symbol: string) {
+  const names: Record<string, string> = {
+    'AAPL': 'Apple Inc.',
+    'MSFT': 'Microsoft Corporation',
+    'GOOGL': 'Alphabet Inc.',
+    'AMZN': 'Amazon.com Inc.',
+  };
+  return names[symbol] || 'Unknown Company';
+}
+
+function getRealisticMockPrice(symbol: string) {
+  const prices: Record<string, number> = {
+    'AAPL': 241.84,
+    'MSFT': 420.35,
+    'GOOGL': 175.98,
+    'AMZN': 178.75,
+  };
+  return prices[symbol] || 100.00;
+}
+
+function getRealisticMockChange(symbol: string) {
+  const changes: Record<string, number> = {
+    'AAPL': 3.61,
+    'MSFT': 5.2,
+    'GOOGL': -1.8,
+    'AMZN': 0.89,
+  };
+  return changes[symbol] || 0.00;
+}
+
+function getRealisticMockPercentChange(symbol: string) {
+  const percentChanges: Record<string, number> = {
+    'AAPL': 1.52,
+    'MSFT': 1.25,
+    'GOOGL': -1.01,
+    'AMZN': 0.5,
+  };
+  return percentChanges[symbol] || 0.00;
+}
 
 export default function Home() {
   const [featuredStocks, setFeaturedStocks] = useState<{
@@ -24,30 +64,6 @@ export default function Home() {
     const fetchFeaturedStocks = async () => {
       setIsLoading(true);
       try {
-        // Clear any existing cache for featured stocks to ensure fresh data
-        featuredSymbols.forEach(symbol => {
-          // Clear all cache keys related to this symbol
-          const cacheKeys = [
-            `stock:data:${symbol}`,
-            `stock:prices:${symbol}:1D`,
-            `stock:prices:${symbol}:1W`,
-            `stock:prices:${symbol}:1M`,
-            `stock:prices:${symbol}:3M`,
-            `stock:prices:${symbol}:1Y`,
-            `stock:prices:${symbol}:5Y`,
-            `stock:enhanced:prices:daily:${symbol}`,
-            `stock:enhanced:prices:weekly:${symbol}`,
-            `stock:enhanced:prices:monthly:${symbol}`,
-            `stock:enhanced:prices:yearly:${symbol}`,
-            `stock:enhanced:prices:5year:${symbol}`
-          ];
-          
-          cacheKeys.forEach(key => {
-            localStorage.removeItem(key);
-            console.log(`Cleared cache for ${key}`);
-          });
-        });
-        
         const stocksData = await Promise.all(
           featuredSymbols.map(async (symbol) => {
             try {
@@ -261,9 +277,9 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-2">Portfolio Tracking</h3>
+              <h3 className="text-xl font-bold mb-2">Comprehensive Analysis</h3>
               <p className="text-gray-600 dark:text-gray-400">
-                Track your investments, monitor performance, and get insights to optimize your portfolio for better returns.
+                Get detailed financial analysis, technical indicators, and fundamental data to make informed investment decisions.
               </p>
             </div>
           </div>
@@ -285,47 +301,3 @@ export default function Home() {
     </div>
   );
 }
-
-// Helper function to get mock company name
-const getMockCompanyName = (symbol: string): string => {
-  switch (symbol) {
-    case 'AAPL': return 'Apple Inc.';
-    case 'MSFT': return 'Microsoft Corporation';
-    case 'GOOGL': return 'Alphabet Inc.';
-    case 'AMZN': return 'Amazon.com Inc.';
-    default: return `${symbol} Inc.`;
-  }
-};
-
-// Helper function to get realistic mock price
-const getRealisticMockPrice = (symbol: string): number => {
-  switch (symbol) {
-    case 'AAPL': return 241.84;
-    case 'MSFT': return 420.35;
-    case 'GOOGL': return 175.98;
-    case 'AMZN': return 178.75;
-    default: return 100.00 + Math.random() * 100;
-  }
-};
-
-// Helper function to get realistic mock change
-const getRealisticMockChange = (symbol: string): number => {
-  switch (symbol) {
-    case 'AAPL': return 3.61;
-    case 'MSFT': return 5.2;
-    case 'GOOGL': return -1.8;
-    case 'AMZN': return 0.89;
-    default: return (Math.random() - 0.5) * 5;
-  }
-};
-
-// Helper function to get realistic mock percent change
-const getRealisticMockPercentChange = (symbol: string): number => {
-  switch (symbol) {
-    case 'AAPL': return 1.52;
-    case 'MSFT': return 1.25;
-    case 'GOOGL': return -1.01;
-    case 'AMZN': return 0.5;
-    default: return (Math.random() - 0.5) * 2;
-  }
-};

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Trie } from './trie';
 import { searchStocks } from '@/lib/api/stockApi';
-import { Company, SearchResult } from '@/types';
+import { SearchResult } from '@/types';
 
 interface SearchContextType {
   searchTerm: string;
@@ -25,65 +25,88 @@ const SearchContext = createContext<SearchContextType>({
 
 export const useSearch = () => useContext(SearchContext);
 
+// Default mock search results to use when API fails
+const defaultSearchResults: SearchResult[] = [
+  { symbol: 'AAPL', name: 'Apple Inc.' },
+  { symbol: 'MSFT', name: 'Microsoft Corporation' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+  { symbol: 'AMZN', name: 'Amazon.com Inc.' },
+  { symbol: 'META', name: 'Meta Platforms Inc.' },
+  { symbol: 'TSLA', name: 'Tesla Inc.' },
+  { symbol: 'NVDA', name: 'NVIDIA Corporation' },
+  { symbol: 'NFLX', name: 'Netflix Inc.' }
+];
+
 export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trie, setTrie] = useState<Trie | null>(null);
+  const [initialized, setInitialized] = useState(false);
   
-  // Initialize the trie with company data
+  // Initialize the trie with company data only once
   useEffect(() => {
+    if (initialized) return;
+    
     const initializeTrie = async () => {
       try {
         setIsLoading(true);
         
-        // In a real application, you would fetch all companies from an API
-        // For now, we'll use our mock search to get some companies
-        const response = await searchStocks('');
+        // Create a new trie with default search results
+        const newTrie = Trie.buildFromCompanies(defaultSearchResults);
+        setTrie(newTrie);
+        setInitialized(true);
         
-        if (response.success && response.data) {
-          const newTrie = Trie.buildFromCompanies(response.data);
-          setTrie(newTrie);
-        } else {
-          setError('Failed to initialize search');
+        // Try to get more companies from API in the background
+        try {
+          const response = await searchStocks('');
+          
+          if (response.success && response.data && response.data.length > 0) {
+            const updatedTrie = Trie.buildFromCompanies(response.data);
+            setTrie(updatedTrie);
+          }
+        } catch (apiError) {
+          console.error('Error fetching companies for search:', apiError);
+          // Keep using the default trie
         }
         
         setIsLoading(false);
-      } catch (error) {
+      } catch (_error) {
+        console.error('Error initializing search:', _error);
         setError('An unexpected error occurred');
         setIsLoading(false);
       }
     };
     
     initializeTrie();
-  }, []);
+  }, [initialized]);
   
-  // Search for companies when the search term changes
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!searchTerm.trim()) {
-        setSearchResults([]);
-        return;
+  // Memoized search function to prevent recreating on each render
+  const performSearch = useCallback(async (term: string) => {
+    if (!term.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // First try to use the trie for fast local search
+      if (trie) {
+        const trieResults = trie.search(term);
+        
+        if (trieResults.length > 0) {
+          setSearchResults(trieResults);
+          setIsLoading(false);
+          return;
+        }
       }
       
-      setIsLoading(true);
-      setError(null);
-      
+      // Fall back to API search if trie doesn't have results
       try {
-        // First try to use the trie for fast local search
-        if (trie) {
-          const trieResults = trie.search(searchTerm);
-          
-          if (trieResults.length > 0) {
-            setSearchResults(trieResults);
-            setIsLoading(false);
-            return;
-          }
-        }
-        
-        // Fall back to API search if trie doesn't have results
-        const response = await searchStocks(searchTerm);
+        const response = await searchStocks(term);
         
         if (response.success && response.data) {
           const results: SearchResult[] = response.data.map(company => ({
@@ -93,22 +116,41 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           setSearchResults(results);
         } else {
-          setError(response.error || 'Search failed');
-          setSearchResults([]);
+          // If API fails, filter default results
+          const filteredResults = defaultSearchResults.filter(
+            result => 
+              result.symbol.toLowerCase().includes(term.toLowerCase()) || 
+              result.name.toLowerCase().includes(term.toLowerCase())
+          );
+          setSearchResults(filteredResults);
         }
-      } catch (error) {
-        setError('An unexpected error occurred');
-        setSearchResults([]);
-      } finally {
-        setIsLoading(false);
+      } catch (apiError) {
+        console.error('API search error:', apiError);
+        // If API fails, filter default results
+        const filteredResults = defaultSearchResults.filter(
+          result => 
+            result.symbol.toLowerCase().includes(term.toLowerCase()) || 
+            result.name.toLowerCase().includes(term.toLowerCase())
+        );
+        setSearchResults(filteredResults);
       }
-    };
-    
-    // Debounce search to avoid too many requests
-    const debounceTimeout = setTimeout(performSearch, 300);
+    } catch (_error) {
+      console.error('Search error:', _error);
+      setError('An unexpected error occurred');
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [trie]);
+  
+  // Search for companies when the search term changes
+  useEffect(() => {
+    const debounceTimeout = setTimeout(() => {
+      performSearch(searchTerm);
+    }, 300);
     
     return () => clearTimeout(debounceTimeout);
-  }, [searchTerm, trie]);
+  }, [searchTerm, performSearch]);
   
   return (
     <SearchContext.Provider

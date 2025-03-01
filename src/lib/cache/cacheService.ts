@@ -3,16 +3,22 @@
  * This version uses in-memory caching for the browser and avoids Node.js specific modules
  */
 
+// Define a generic type for cache values
+type CacheValue<T> = {
+  value: T;
+  expiry: number;
+};
+
 // Default cache TTL in seconds
 const DEFAULT_CACHE_TTL = parseInt(process.env.CACHE_TTL || '86400', 10); // 24 hours
 
 // In-memory cache storage
-const memoryCache: Record<string, { value: any; expiry: number }> = {};
+const memoryCache: Record<string, CacheValue<unknown>> = {};
 
 /**
  * Set a value in the cache with optional TTL
  */
-export async function set(key: string, value: any, ttl = DEFAULT_CACHE_TTL): Promise<void> {
+export async function set<T>(key: string, value: T, ttl = DEFAULT_CACHE_TTL): Promise<void> {
   try {
     // Store in memory cache
     const expiry = ttl > 0 ? Date.now() + (ttl * 1000) : Infinity;

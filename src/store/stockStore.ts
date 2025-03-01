@@ -145,8 +145,8 @@ export const useStockStore = create<StockState>((set, get) => ({
     // Clear from localStorage
     try {
       localStorage.removeItem('searchHistory');
-    } catch (error) {
-      console.error('Failed to clear search history from localStorage:', error);
+    } catch (_error) {
+      console.error('Failed to clear search history from localStorage:');
     }
   },
 })); 

@@ -1,8 +1,7 @@
 import axios from 'axios';
-import { format, subDays, subMonths, subYears } from 'date-fns';
+// import { format, subDays, subMonths, subYears } from 'date-fns';
 import { ApiResponse, Company, StockData, StockPrice, TimeRange as ApiTimeRange } from '@/types';
 import cacheService from '../cache/cacheService';
-import { generateMockPrices } from '@/lib/utils/mockData';
 
 // Define the Stock and StockPrices types here since there's an issue with importing them
 export interface Stock {
@@ -105,6 +104,29 @@ const mockCompanies: Company[] = [
   },
   // Add more mock companies as needed
 ];
+
+// Define proper types for API responses
+type PolygonPriceResult = {
+  t: number; // timestamp
+  o: number; // open
+  h: number; // high
+  l: number; // low
+  c: number; // close
+  v: number; // volume
+};
+
+type PolygonCompanyResult = {
+  ticker: string;
+  name: string;
+  description?: string;
+  sic_description?: string;
+  industry?: string;
+  market_cap?: number;
+  total_employees?: number;
+  ceo?: string;
+  homepage_url?: string;
+  primary_exchange?: string;
+};
 
 // Get company details
 export const getCompanyDetails = async (symbol: string): Promise<ApiResponse<Company>> => {
@@ -229,7 +251,7 @@ export const getStockPriceData = async (
       );
       
       if (response.data && response.data.results) {
-        const prices: StockPrice[] = response.data.results.map((item: Record<string, any>) => ({
+        const prices: StockPrice[] = response.data.results.map((item: PolygonPriceResult) => ({
           timestamp: item.t,
           open: item.o,
           high: item.h,
@@ -264,7 +286,7 @@ export const getStockPriceData = async (
                   timeRange === '1Y' ? 365 : 1825; // 5 years = 1825 days
       
       const basePrice = getRealisticBasePrice(symbol);
-      const mockPrices = generateMockPrices(days, basePrice);
+      const mockPrices = generateMockPrices(symbol, timeRange, days);
       console.log(`Generated ${mockPrices.length} mock price points for ${symbol} (${timeRange})`);
       
       // Cache the result
@@ -289,7 +311,7 @@ export const getStockPriceData = async (
                 timeRange === '1Y' ? 365 : 1825; // 5 years = 1825 days
     
     const basePrice = getRealisticBasePrice(symbol);
-    const prices = generateMockPrices(days, basePrice);
+    const prices = generateMockPrices(symbol, timeRange, days);
     console.log(`Generated ${prices.length} mock price points for ${symbol} (${timeRange}) after error`);
     
     // Cache the result
@@ -385,7 +407,7 @@ export const searchStocks = async (query: string): Promise<ApiResponse<Company[]
       });
       
       if (response.data && response.data.results) {
-        const companies: Company[] = response.data.results.map((item: Record<string, any>) => ({
+        const companies: Company[] = response.data.results.map((item: PolygonCompanyResult) => ({
           symbol: item.ticker,
           name: item.name,
           description: '',
@@ -556,7 +578,7 @@ export async function getEnhancedSearchStocks(query: string): Promise<Stock[]> {
       return [];
     }
 
-    const stocks = data.results.map((item: Record<string, any>) => ({
+    const stocks = data.results.map((item: PolygonCompanyResult) => ({
       symbol: item.ticker,
       name: item.name,
       description: '',
@@ -616,4 +638,37 @@ export async function getEnhancedPopularStocks(): Promise<Stock[]> {
     console.error('Error fetching enhanced popular stocks:', error);
     return [];
   }
-} 
+}
+
+// Add a simple implementation of generateMockPrices
+const generateMockPrices = (
+  symbol: string, 
+  timeRange: ApiTimeRange, 
+  count: number
+): StockPrice[] => {
+  const now = new Date();
+  const prices: StockPrice[] = [];
+  
+  // Generate random prices based on a starting value
+  const basePrice = symbol === 'AAPL' ? 180 : 
+                   symbol === 'MSFT' ? 350 : 
+                   symbol === 'GOOGL' ? 140 : 
+                   symbol === 'AMZN' ? 130 : 100;
+  
+  for (let i = 0; i < count; i++) {
+    const timestamp = now.getTime() - (i * 86400000); // One day in milliseconds
+    const randomFactor = 0.02 * (Math.random() - 0.5); // Random factor between -1% and 1%
+    const price = basePrice * (1 + randomFactor);
+    
+    prices.push({
+      timestamp,
+      open: price * 0.99,
+      high: price * 1.01,
+      low: price * 0.98,
+      close: price,
+      volume: Math.floor(Math.random() * 10000000)
+    });
+  }
+  
+  return prices.reverse(); // Return in chronological order
+}; 

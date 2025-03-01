@@ -2,7 +2,13 @@
 
 A modern stock analysis and screening tool for investors, similar to Screener.in. This application allows users to search for stocks, view interactive charts with different time ranges, and access detailed company information.
 
-![StockScreener Screenshot](https://via.placeholder.com/800x400?text=StockScreener+Screenshot)
+## Screenshots
+
+### Home Page
+![StockScreener Home Page](https://via.placeholder.com/800x400?text=StockScreener+Home+Page)
+
+### Stock Detail Page
+![StockScreener Stock Detail](https://via.placeholder.com/800x400?text=StockScreener+Stock+Detail+Page)
 
 ## Features
 

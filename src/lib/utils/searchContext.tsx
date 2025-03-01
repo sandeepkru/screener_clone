@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Trie } from './trie';
-import { searchCompanies } from '@/lib/api/stockApi';
+import { searchStocks } from '@/lib/api/stockApi';
 import { Company, SearchResult } from '@/types';
 
 interface SearchContextType {
@@ -40,7 +40,7 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         
         // In a real application, you would fetch all companies from an API
         // For now, we'll use our mock search to get some companies
-        const response = await searchCompanies('');
+        const response = await searchStocks('');
         
         if (response.success && response.data) {
           const newTrie = Trie.buildFromCompanies(response.data);
@@ -83,7 +83,7 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         
         // Fall back to API search if trie doesn't have results
-        const response = await searchCompanies(searchTerm);
+        const response = await searchStocks(searchTerm);
         
         if (response.success && response.data) {
           const results: SearchResult[] = response.data.map(company => ({

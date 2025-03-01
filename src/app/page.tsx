@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { searchCompanies, getStockData } from '@/lib/api/stockApi';
+import { getStockData } from '@/lib/api/stockApi';
 import { Company, StockData } from '@/types';
 
 export default function Home() {

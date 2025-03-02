@@ -4,220 +4,48 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getStockData, getEnhancedStockDetails, getEnhancedStockPrices } from '@/lib/api/stockApi';
-import { getCachedFeaturedStocks, FEATURED_SYMBOLS } from '@/lib/cache/prefetch';
-
-// Mock data functions
-function getMockCompanyName(symbol: string) {
-  const names: Record<string, string> = {
-    'AAPL': 'Apple Inc.',
-    'MSFT': 'Microsoft Corporation',
-    'GOOGL': 'Alphabet Inc.',
-    'AMZN': 'Amazon.com Inc.',
-    'META': 'Meta Platforms, Inc.',
-    'TSLA': 'Tesla, Inc.',
-    'NVDA': 'NVIDIA Corporation',
-    'JPM': 'JPMorgan Chase & Co.',
-    'V': 'Visa Inc.',
-    'WMT': 'Walmart Inc.'
-  };
-  return names[symbol] || 'Unknown Company';
-}
-
-function getRealisticMockPrice(symbol: string) {
-  const prices: Record<string, number> = {
-    'AAPL': 241.84,
-    'MSFT': 420.35,
-    'GOOGL': 175.98,
-    'AMZN': 178.75,
-    'META': 485.20,
-    'TSLA': 175.30,
-    'NVDA': 950.25,
-    'JPM': 198.45,
-    'V': 275.60,
-    'WMT': 68.75
-  };
-  return prices[symbol] || 100.00;
-}
-
-function getRealisticMockChange(symbol: string) {
-  const changes: Record<string, number> = {
-    'AAPL': 3.61,
-    'MSFT': 5.2,
-    'GOOGL': -1.8,
-    'AMZN': 0.89,
-    'META': 7.35,
-    'TSLA': -2.45,
-    'NVDA': 15.80,
-    'JPM': 2.35,
-    'V': 3.25,
-    'WMT': -0.45
-  };
-  return changes[symbol] || 0.00;
-}
-
-function getRealisticMockPercentChange(symbol: string) {
-  const percentChanges: Record<string, number> = {
-    'AAPL': 1.52,
-    'MSFT': 1.25,
-    'GOOGL': -1.01,
-    'AMZN': 0.5,
-    'META': 1.54,
-    'TSLA': -1.38,
-    'NVDA': 1.69,
-    'JPM': 1.20,
-    'V': 1.19,
-    'WMT': -0.65
-  };
-  return percentChanges[symbol] || 0.00;
-}
-
-// Helper function to get complete mock data for a symbol
-function getMockData(symbol: string) {
-  return {
-    symbol,
-    name: getMockCompanyName(symbol),
-    price: getRealisticMockPrice(symbol),
-    change: getRealisticMockChange(symbol),
-    percentChange: getRealisticMockPercentChange(symbol)
-  };
-}
-
-// Define the FeaturedStock type
-interface FeaturedStock {
-  symbol: string;
-  name: string;
-  price: number;
-  change: number;
-  percentChange: number;
-  isMockData?: boolean;
-}
+import { FEATURED_SYMBOLS } from '@/lib/cache/prefetch';
+import FeaturedStocks from '@/components/FeaturedStocks';
 
 export default function Home() {
-  const [featuredStocks, setFeaturedStocks] = useState<{
-    symbol: string;
-    name: string;
-    price: number;
-    change: number;
-    percentChange: number;
-    isMockData?: boolean;
-  }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
   // Use the predefined list of featured symbols from the prefetch utility
   const featuredSymbols = useMemo(() => FEATURED_SYMBOLS, []);
   
+  // Detect dark mode
   useEffect(() => {
-    const fetchFeaturedStocks = async () => {
-      setIsLoading(true);
-      
-      try {
-        // First try to get cached featured stocks
-        const cachedStocks = await getCachedFeaturedStocks();
-        
-        if (cachedStocks && cachedStocks.length > 0) {
-          console.log('Using cached featured stocks data');
-          
-          // Transform cached stocks to match the expected format
-          const formattedStocks = cachedStocks.map(stock => ({
-            symbol: stock.symbol,
-            name: stock.name,
-            price: stock.price,
-            change: stock.change,
-            percentChange: stock.percentChange,
-            isMockData: stock.isMockData || false
-          }));
-          
-          setFeaturedStocks(formattedStocks);
-          setIsLoading(false);
-          
-          // Refresh the cache in the background
-          fetch('/api/cache/refresh-featured')
-            .then(() => console.log('Featured stocks cache refreshed in background'))
-            .catch(error => console.error('Error refreshing featured stocks cache:', error));
-          
-          return;
-        }
-        
-        // If no cached data, fall back to the existing implementation
-        const validStocks: FeaturedStock[] = [];
-        
-        for (const symbol of featuredSymbols) {
-          try {
-            console.log(`Fetching enhanced data for ${symbol}...`);
-            
-            // Get stock details
-            const details = await getEnhancedStockDetails(symbol);
-            
-            if (!details) {
-              throw new Error(`No details found for ${symbol}`);
-            }
-            
-            // Get daily prices
-            const prices = await getEnhancedStockPrices(symbol);
-            
-            if (!prices || prices.daily.length === 0) {
-              throw new Error(`No price data found for ${symbol}`);
-            }
-            
-            // Calculate price change
-            const latestPrice = prices.daily[prices.daily.length - 1].price;
-            let priceChange = 0;
-            let percentChange = 0;
-            
-            if (prices.daily.length >= 2) {
-              const previousPrice = prices.daily[0].price;
-              priceChange = latestPrice - previousPrice;
-              percentChange = (priceChange / previousPrice) * 100;
-            }
-            
-            console.log(`Successfully fetched enhanced data for ${symbol}: $${latestPrice.toFixed(2)}`);
-            
-            validStocks.push({
-              symbol,
-              name: details.name,
-              price: latestPrice,
-              change: priceChange,
-              percentChange: percentChange,
-              isMockData: false
-            });
-          } catch (error) {
-            console.error(`Error fetching data for ${symbol}:`, error);
-            
-            // Use fallback mock data
-            const mockData = getMockData(symbol);
-            if (mockData) {
-              validStocks.push({
-                ...mockData,
-                isMockData: true
-              });
-            }
-          }
-        }
-        
-        // Filter out any undefined stocks
-        const filteredStocks = validStocks.filter(Boolean);
-        setFeaturedStocks(filteredStocks);
-      } catch (error) {
-        console.error('Error fetching featured stocks:', error);
-        
-        // Use fallback mock data for all stocks
-        const mockStocks = featuredSymbols
-          .map(symbol => {
-            const mockData = getMockData(symbol);
-            return mockData ? { ...mockData, isMockData: true } : null;
-          })
-          .filter(Boolean) as FeaturedStock[];
-        
-        setFeaturedStocks(mockStocks);
-      } finally {
-        setIsLoading(false);
-      }
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeMediaQuery.matches);
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsDarkMode(e.matches);
     };
     
-    fetchFeaturedStocks();
-  }, [featuredSymbols]);
-  
+    darkModeMediaQuery.addEventListener('change', handleChange);
+    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Also check for dark mode class on document
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(isDark);
+    };
+    
+    // Initial check
+    checkDarkMode();
+    
+    // Set up a mutation observer to watch for class changes on the html element
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -243,50 +71,7 @@ export default function Home() {
       </section>
       
       {/* Featured Stocks */}
-      <section className="py-16 bg-gray-50 dark:bg-gray-900">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">Featured Stocks</h2>
-          
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent"></div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredStocks.map((stock) => (
-                <Link key={stock.symbol} href={`/stock/${stock.symbol}`}>
-                  <Card className="h-full hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="text-lg font-bold">{stock.symbol}</h3>
-                          <p className="text-sm text-gray-500">{stock.name}</p>
-                          {stock.isMockData && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
-                              Mock Data
-                            </span>
-                          )}
-                        </div>
-                        <div className={`text-right ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          <p className="text-lg font-bold">
-                            ${(stock.price !== undefined && stock.price !== null) ? stock.price.toFixed(2) : '0.00'}
-                          </p>
-                          <p className="text-sm">
-                            {stock.change >= 0 ? '+' : ''}
-                            {(stock.change !== undefined && stock.change !== null) ? stock.change.toFixed(2) : '0.00'} ({stock.change >= 0 ? '+' : ''}
-                            {(stock.percentChange !== undefined && stock.percentChange !== null) ? stock.percentChange.toFixed(2) : '0.00'}%)
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="outline" className="w-full">View Details</Button>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+      <FeaturedStocks />
       
       {/* Features Section */}
       <section className="py-16">

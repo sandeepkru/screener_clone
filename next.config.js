@@ -1,5 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Ensure server-only modules are not included in client bundles
+  experimental: {
+    serverComponentsExternalPackages: ['ioredis'],
+  },
+  // Add webpack configuration to handle Node.js modules
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Don't attempt to import these packages on the client side
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        dns: false,
+        net: false,
+        tls: false,
+        fs: false,
+      };
+    }
+    return config;
+  },
   typescript: {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if

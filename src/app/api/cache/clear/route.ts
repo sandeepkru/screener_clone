@@ -14,11 +14,11 @@ export async function POST() {
     });
   } catch (error) {
     console.error('Error clearing cache:', error);
+    
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to clear cache',
-        timestamp: new Date().toISOString()
+      {
+        success: false,
+        error: 'Failed to clear cache'
       },
       { status: 500 }
     );

@@ -19,94 +19,8 @@ const MAX_CACHE_SIZE = 30 * 1024 * 1024;
 const memoryCache: Record<string, CacheValue<unknown>> = {};
 let memoryCacheSize = 0;
 
-// Initialize Redis client if REDIS_URL is available and we're on the server
-let redisClient: any = null;
-let isRedisConnecting = false;
-let redisConnectionFailed = false;
-
-// Only import Redis on the server side
-if (typeof window === 'undefined') {
-  initRedisConnection();
-}
-
-async function initRedisConnection() {
-  if (isRedisConnecting || redisClient) return;
-  
-  isRedisConnecting = true;
-  
-  try {
-    // We're on the server
-    const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-    
-    if (!REDIS_URL) {
-      console.log('No REDIS_URL provided, using in-memory cache');
-      isRedisConnecting = false;
-      redisConnectionFailed = true;
-      return;
-    }
-    
-    const Redis = await import('ioredis').catch(err => {
-      console.error('Failed to import ioredis:', err);
-      redisConnectionFailed = true;
-      return null;
-    });
-    
-    if (!Redis) {
-      isRedisConnecting = false;
-      return;
-    }
-    
-    try {
-      redisClient = new Redis.default(REDIS_URL, {
-        maxRetriesPerRequest: 3,
-        connectTimeout: 5000,
-        enableOfflineQueue: true,
-        retryStrategy(times) {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
-        }
-      });
-      
-      redisClient.on('error', (err: Error) => {
-        console.error('Redis connection error:', err);
-        if (redisClient && !redisConnectionFailed) {
-          redisConnectionFailed = true;
-          console.log('Falling back to in-memory cache due to Redis error');
-        }
-      });
-      
-      redisClient.on('connect', () => {
-        console.log('Connected to Redis server');
-        redisConnectionFailed = false;
-      });
-      
-      redisClient.on('reconnecting', () => {
-        console.log('Reconnecting to Redis server...');
-      });
-      
-      // Test connection
-      await redisClient.ping().then(() => {
-        console.log('Redis server is responsive');
-      }).catch((err: Error) => {
-        console.error('Redis ping failed:', err);
-        redisConnectionFailed = true;
-      });
-    } catch (error) {
-      console.error('Failed to initialize Redis client:', error);
-      redisClient = null;
-      redisConnectionFailed = true;
-    }
-  } finally {
-    isRedisConnecting = false;
-  }
-}
-
-/**
- * Check if Redis is available
- */
-function isRedisAvailable(): boolean {
-  return !!redisClient && !redisConnectionFailed;
-}
+// Flag to track if we're in a server environment
+const isServer = typeof window === 'undefined';
 
 /**
  * Estimate the size of an object in bytes
@@ -121,7 +35,7 @@ function estimateSize(obj: unknown): number {
  * Enforce cache size limit for in-memory cache
  */
 function enforceSizeLimit(newItemSize: number): void {
-  if (!isRedisAvailable() && memoryCacheSize + newItemSize > MAX_CACHE_SIZE) {
+  if (memoryCacheSize + newItemSize > MAX_CACHE_SIZE) {
     // Simple LRU-like eviction: remove oldest entries first
     const entries = Object.entries(memoryCache);
     entries.sort((a, b) => (a[1].expiry - b[1].expiry));
@@ -143,21 +57,20 @@ export async function set<T>(key: string, value: T, ttl = DEFAULT_CACHE_TTL): Pr
   try {
     const expiry = ttl > 0 ? Date.now() + (ttl * 1000) : Infinity;
     
-    if (isRedisAvailable()) {
-      // Use Redis for caching
+    // Try Redis first if we're on the server
+    if (isServer) {
       try {
-        const serializedValue = JSON.stringify({ value, expiry });
-        await redisClient.set(key, serializedValue);
+        // Dynamically import the server-side Redis implementation
+        const { setRedisCache } = await import('./redisCache.server');
+        const redisResult = await setRedisCache(key, value, ttl);
         
-        if (ttl > 0) {
-          await redisClient.expire(key, ttl);
+        if (redisResult) {
+          // Successfully stored in Redis
+          return;
         }
-        
-        console.log(`Redis cache set: ${key} (expires in ${ttl}s)`);
-        return;
       } catch (redisError) {
+        // Redis failed, fall back to memory cache
         console.error(`Redis error when setting ${key}:`, redisError);
-        // Fall through to in-memory cache
       }
     }
     
@@ -179,30 +92,20 @@ export async function set<T>(key: string, value: T, ttl = DEFAULT_CACHE_TTL): Pr
  */
 export async function get<T>(key: string): Promise<T | null> {
   try {
-    if (isRedisAvailable()) {
-      // Try to get from Redis
+    // Try Redis first if we're on the server
+    if (isServer) {
       try {
-        const cachedData = await redisClient.get(key);
+        // Dynamically import the server-side Redis implementation
+        const { getRedisCache } = await import('./redisCache.server');
+        const redisValue = await getRedisCache<T>(key);
         
-        if (!cachedData) {
-          console.log(`Redis cache miss: ${key}`);
-          return null;
+        if (redisValue !== null) {
+          // Successfully retrieved from Redis
+          return redisValue;
         }
-        
-        const parsed = JSON.parse(cachedData) as CacheValue<T>;
-        
-        // Check if cache has expired
-        if (parsed.expiry < Date.now()) {
-          console.log(`Redis cache expired: ${key}`);
-          await redisClient.del(key);
-          return null;
-        }
-        
-        console.log(`Redis cache hit: ${key}`);
-        return parsed.value;
       } catch (redisError) {
+        // Redis failed, fall back to memory cache
         console.error(`Redis error when getting ${key}:`, redisError);
-        // Fall through to in-memory cache
       }
     }
     
@@ -237,10 +140,12 @@ export async function get<T>(key: string): Promise<T | null> {
  */
 export async function del(key: string): Promise<void> {
   try {
-    if (isRedisAvailable()) {
+    // Try Redis first if we're on the server
+    if (isServer) {
       try {
-        await redisClient.del(key);
-        console.log(`Redis cache deleted: ${key}`);
+        // Dynamically import the server-side Redis implementation
+        const { deleteRedisCache } = await import('./redisCache.server');
+        await deleteRedisCache(key);
       } catch (redisError) {
         console.error(`Redis error when deleting ${key}:`, redisError);
       }
@@ -263,10 +168,12 @@ export async function del(key: string): Promise<void> {
  */
 export async function clear(): Promise<void> {
   try {
-    if (isRedisAvailable()) {
+    // Try Redis first if we're on the server
+    if (isServer) {
       try {
-        await redisClient.flushdb();
-        console.log('Redis cache cleared');
+        // Dynamically import the server-side Redis implementation
+        const { clearRedisCache } = await import('./redisCache.server');
+        await clearRedisCache();
       } catch (redisError) {
         console.error('Redis error when clearing cache:', redisError);
       }
@@ -294,32 +201,30 @@ export async function getStats(): Promise<{
   redisAvailable?: boolean;
 }> {
   try {
-    if (isRedisAvailable()) {
+    // Try Redis first if we're on the server
+    if (isServer) {
       try {
-        const info = await redisClient.info('memory');
-        const dbSize = await redisClient.dbsize();
+        // Dynamically import the server-side Redis implementation
+        const { getRedisStats } = await import('./redisCache.server');
+        const redisStats = await getRedisStats();
         
-        // Parse memory info
-        const usedMemoryMatch = info.match(/used_memory_human:([^\r\n]+)/);
-        const usedMemory = usedMemoryMatch ? usedMemoryMatch[1].trim() : 'unknown';
-        
-        return {
-          type: 'redis',
-          keys: dbSize,
-          memory: usedMemory,
-          redisAvailable: true
-        };
+        if (redisStats) {
+          return {
+            ...redisStats,
+            redisAvailable: true
+          };
+        }
       } catch (redisError) {
         console.error('Redis error when getting stats:', redisError);
-        // Fall through to in-memory stats
       }
     }
     
+    // Fallback to memory cache stats
     return {
       type: 'memory',
       size: memoryCacheSize,
       keys: Object.keys(memoryCache).length,
-      redisAvailable: isRedisAvailable()
+      redisAvailable: false
     };
   } catch (error) {
     console.error('Error getting cache stats:', error);

@@ -13,12 +13,12 @@ export async function GET() {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error getting cache stats:', error);
+    console.error('Error fetching cache stats:', error);
+    
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to get cache statistics',
-        timestamp: new Date().toISOString()
+      {
+        success: false,
+        error: 'Failed to fetch cache statistics'
       },
       { status: 500 }
     );

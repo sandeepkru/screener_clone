@@ -3,8 +3,6 @@
  * This file should only be imported on the server side
  */
 
-'use server';
-
 import { Redis } from 'ioredis';
 
 // Define a generic type for cache values

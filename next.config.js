@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Ensure server-only modules are not included in client bundles
-  experimental: {
-    serverComponentsExternalPackages: ['ioredis'],
-  },
+  serverExternalPackages: ['ioredis'],
   // Add webpack configuration to handle Node.js modules
   webpack: (config, { isServer }) => {
     if (!isServer) {

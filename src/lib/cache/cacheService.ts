@@ -61,8 +61,8 @@ export async function set<T>(key: string, value: T, ttl = DEFAULT_CACHE_TTL): Pr
     if (isServer) {
       try {
         // Dynamically import the server-side Redis implementation
-        const { setRedisCache } = await import('./redisCache.server');
-        const redisResult = await setRedisCache(key, value, ttl);
+        const redisCacheModule = await import('./redisCache.server');
+        const redisResult = await redisCacheModule.setRedisCache(key, value, ttl);
         
         if (redisResult) {
           // Successfully stored in Redis
@@ -96,8 +96,8 @@ export async function get<T>(key: string): Promise<T | null> {
     if (isServer) {
       try {
         // Dynamically import the server-side Redis implementation
-        const { getRedisCache } = await import('./redisCache.server');
-        const redisValue = await getRedisCache<T>(key);
+        const redisCacheModule = await import('./redisCache.server');
+        const redisValue = await redisCacheModule.getRedisCache<T>(key);
         
         if (redisValue !== null) {
           // Successfully retrieved from Redis
@@ -144,8 +144,8 @@ export async function del(key: string): Promise<void> {
     if (isServer) {
       try {
         // Dynamically import the server-side Redis implementation
-        const { deleteRedisCache } = await import('./redisCache.server');
-        await deleteRedisCache(key);
+        const redisCacheModule = await import('./redisCache.server');
+        await redisCacheModule.deleteRedisCache(key);
       } catch (redisError) {
         console.error(`Redis error when deleting ${key}:`, redisError);
       }
@@ -172,8 +172,8 @@ export async function clear(): Promise<void> {
     if (isServer) {
       try {
         // Dynamically import the server-side Redis implementation
-        const { clearRedisCache } = await import('./redisCache.server');
-        await clearRedisCache();
+        const redisCacheModule = await import('./redisCache.server');
+        await redisCacheModule.clearRedisCache();
       } catch (redisError) {
         console.error('Redis error when clearing cache:', redisError);
       }
@@ -205,8 +205,8 @@ export async function getStats(): Promise<{
     if (isServer) {
       try {
         // Dynamically import the server-side Redis implementation
-        const { getRedisStats } = await import('./redisCache.server');
-        const redisStats = await getRedisStats();
+        const redisCacheModule = await import('./redisCache.server');
+        const redisStats = await redisCacheModule.getRedisStats();
         
         if (redisStats) {
           return {

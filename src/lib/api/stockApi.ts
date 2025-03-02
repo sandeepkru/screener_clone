@@ -652,26 +652,67 @@ const generateMockPrices = (
   const now = new Date();
   const prices: StockPrice[] = [];
   
-  // Generate random prices based on a starting value
-  const basePrice = symbol === 'AAPL' ? 180 : 
-                   symbol === 'MSFT' ? 350 : 
-                   symbol === 'GOOGL' ? 140 : 
-                   symbol === 'AMZN' ? 130 : 100;
+  // Use more realistic base prices for popular stocks
+  const basePrice = symbol === 'AAPL' ? 180.95 : 
+                   symbol === 'MSFT' ? 417.88 : 
+                   symbol === 'GOOGL' ? 175.98 : 
+                   symbol === 'AMZN' ? 178.75 : 
+                   symbol === 'META' ? 474.99 :
+                   symbol === 'TSLA' ? 175.22 :
+                   symbol === 'NVDA' ? 950.02 :
+                   symbol === 'NFLX' ? 605.88 : 100.00;
+  
+  // Determine time interval based on timeRange
+  let interval: number;
+  switch(timeRange) {
+    case '1D': interval = 5 * 60 * 1000; break; // 5 minutes
+    case '1W': interval = 60 * 60 * 1000; break; // 1 hour
+    case '1M': case '3M': interval = 24 * 60 * 60 * 1000; break; // 1 day
+    case '1Y': interval = 7 * 24 * 60 * 60 * 1000; break; // 1 week
+    case '5Y': interval = 30 * 24 * 60 * 60 * 1000; break; // 1 month
+    default: interval = 24 * 60 * 60 * 1000; // Default to 1 day
+  }
+  
+  // Create a trend direction for this stock (up, down, or sideways)
+  const trendDirection = Math.random() > 0.7 ? -1 : 1; // 70% chance of upward trend
+  const volatility = symbol === 'TSLA' || symbol === 'NVDA' ? 0.03 : 0.015; // Higher volatility for some stocks
+  
+  let currentPrice = basePrice;
   
   for (let i = 0; i < count; i++) {
-    const timestamp = now.getTime() - (i * 86400000); // One day in milliseconds
-    const randomFactor = 0.02 * (Math.random() - 0.5); // Random factor between -1% and 1%
-    const price = basePrice * (1 + randomFactor);
+    const timestamp = now.getTime() - ((count - i - 1) * interval);
+    
+    // Add some randomness but maintain a general trend
+    const randomFactor = volatility * (Math.random() - 0.5); // Random factor between -volatility/2 and +volatility/2
+    const trendFactor = (i / count) * volatility * trendDirection; // Gradual trend component
+    
+    // Update the price with both random movement and trend
+    currentPrice = currentPrice * (1 + randomFactor + trendFactor);
+    
+    // Ensure price doesn't go negative or too low
+    currentPrice = Math.max(currentPrice, basePrice * 0.5);
+    
+    // Calculate realistic open, high, low values based on close
+    const dailyVolatility = volatility * 0.7;
+    const open = currentPrice * (1 + dailyVolatility * (Math.random() - 0.5));
+    const high = Math.max(open, currentPrice) * (1 + dailyVolatility * Math.random());
+    const low = Math.min(open, currentPrice) * (1 - dailyVolatility * Math.random());
+    
+    // Generate realistic volume based on stock popularity
+    const baseVolume = symbol === 'AAPL' || symbol === 'TSLA' ? 20000000 : 
+                      symbol === 'NVDA' || symbol === 'AMZN' ? 15000000 : 
+                      symbol === 'MSFT' || symbol === 'GOOGL' ? 10000000 : 5000000;
+    const volume = Math.floor(baseVolume * (0.7 + 0.6 * Math.random()));
     
     prices.push({
       timestamp,
-      open: price * 0.99,
-      high: price * 1.01,
-      low: price * 0.98,
-      close: price,
-      volume: Math.floor(Math.random() * 10000000)
+      open,
+      high,
+      low,
+      close: currentPrice,
+      volume
     });
   }
   
-  return prices.reverse(); // Return in chronological order
+  return prices; // Already in chronological order
 }; 

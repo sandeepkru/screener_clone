@@ -72,13 +72,11 @@ export const useStockStore = create<StockState>((set, get) => ({
         get().addToSearchHistory(symbol);
       } else {
         set({ 
-          error: response.error || 'Failed to fetch stock data',
           isLoading: false,
         });
       }
-    } catch (error) {
+    } catch {
       set({ 
-        error: 'An unexpected error occurred',
         isLoading: false,
       });
     }
@@ -145,7 +143,7 @@ export const useStockStore = create<StockState>((set, get) => ({
     // Clear from localStorage
     try {
       localStorage.removeItem('searchHistory');
-    } catch (_error) {
+    } catch {
       console.error('Failed to clear search history from localStorage:');
     }
   },

@@ -4,11 +4,13 @@ import StockChart from '@/components/stock/StockChart';
 import StockInfo from '@/components/stock/StockInfo';
 import { getEnhancedStockDetails, getEnhancedStockPrices } from '@/lib/api/stockApi';
 import { Stock, StockPrices } from '@/types/stock';
+import Link from 'next/link';
 
 interface StockPageProps {
   params: {
     symbol: string;
   };
+  searchParams?: Record<string, string | string[] | undefined>;
 }
 
 export async function generateMetadata({ params }: StockPageProps): Promise<Metadata> {
@@ -48,12 +50,12 @@ function StockPageFallback() {
         <p className="text-red-700 dark:text-red-300 mb-4">
           We encountered an error while loading the stock data. Please try again later.
         </p>
-        <a 
+        <Link 
           href="/"
           className="inline-block bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
         >
           Return to Home
-        </a>
+        </Link>
       </div>
     </div>
   );

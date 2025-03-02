@@ -285,7 +285,6 @@ export const getStockPriceData = async (
                   timeRange === '3M' ? 90 : 
                   timeRange === '1Y' ? 365 : 1825; // 5 years = 1825 days
       
-      const basePrice = getRealisticBasePrice(symbol);
       const mockPrices = generateMockPrices(symbol, timeRange, days);
       console.log(`Generated ${mockPrices.length} mock price points for ${symbol} (${timeRange})`);
       
@@ -310,7 +309,6 @@ export const getStockPriceData = async (
                 timeRange === '3M' ? 90 : 
                 timeRange === '1Y' ? 365 : 1825; // 5 years = 1825 days
     
-    const basePrice = getRealisticBasePrice(symbol);
     const prices = generateMockPrices(symbol, timeRange, days);
     console.log(`Generated ${prices.length} mock price points for ${symbol} (${timeRange}) after error`);
     
@@ -326,21 +324,6 @@ export const getStockPriceData = async (
     return { success: true, data: prices };
   }
 };
-
-// Helper function to get realistic base price for a stock
-function getRealisticBasePrice(symbol: string): number {
-  switch (symbol.toUpperCase()) {
-    case 'AAPL': return 180 + Math.random() * 20; // Around $180-$200
-    case 'MSFT': return 380 + Math.random() * 40; // Around $380-$420
-    case 'GOOGL': return 160 + Math.random() * 20; // Around $160-$180
-    case 'AMZN': return 170 + Math.random() * 20; // Around $170-$190
-    case 'META': return 480 + Math.random() * 40; // Around $480-$520
-    case 'TSLA': return 220 + Math.random() * 30; // Around $220-$250
-    case 'NVDA': return 900 + Math.random() * 100; // Around $900-$1000
-    case 'NFLX': return 600 + Math.random() * 50; // Around $600-$650
-    default: return 100 + Math.random() * 900; // Random price between $100 and $1000
-  }
-}
 
 // Get all stock data for a symbol
 export const getStockData = async (symbol: string): Promise<ApiResponse<StockData>> => {

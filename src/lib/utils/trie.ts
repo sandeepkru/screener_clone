@@ -99,7 +99,7 @@ export class Trie {
     }
     
     // Recursively explore all children
-    for (const [_unused, childNode] of node.children) {
+    for (const [, childNode] of node.children) {
       this._collectCompanies(childNode, results, limit);
       
       if (results.length >= limit) {

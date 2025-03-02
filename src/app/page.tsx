@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -58,7 +58,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Featured stock symbols
-  const featuredSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN'];
+  const featuredSymbols = useMemo(() => ['AAPL', 'MSFT', 'GOOGL', 'AMZN'], []);
   
   useEffect(() => {
     const fetchFeaturedStocks = async () => {
@@ -136,7 +136,7 @@ export default function Home() {
     };
     
     fetchFeaturedStocks();
-  }, []);
+  }, [featuredSymbols]);
   
   return (
     <div className="flex flex-col min-h-screen">

@@ -7,14 +7,15 @@ import { Stock, StockPrices } from '@/types/stock';
 import Link from 'next/link';
 
 interface StockPageProps {
-  params: {
+  params: Promise<{
     symbol: string;
-  };
+  }>;
   searchParams?: Record<string, string | string[] | undefined>;
 }
 
 export async function generateMetadata({ params }: StockPageProps): Promise<Metadata> {
-  const { symbol } = params;
+  const resolvedParams = await params;
+  const symbol = resolvedParams.symbol;
   
   try {
     const stock = await getEnhancedStockDetails(symbol);
@@ -72,7 +73,8 @@ const emptyPrices: StockPrices = {
 };
 
 export default async function StockPage({ params }: StockPageProps) {
-  const { symbol } = params;
+  const resolvedParams = await params;
+  const symbol = resolvedParams.symbol;
   console.log(`Fetching stock data for symbol: ${symbol}`);
   
   let stock: Stock | null = null;
@@ -96,7 +98,7 @@ export default async function StockPage({ params }: StockPageProps) {
     
     // Log what we got for debugging
     console.log('Stock data loaded:', {
-      symbol: params.symbol,
+      symbol,
       hasStockDetails: !!stock,
       dailyPrices: prices?.daily?.length || 0,
       weeklyPrices: prices?.weekly?.length || 0,

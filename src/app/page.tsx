@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getStockData, getEnhancedStockDetails, getEnhancedStockPrices } from '@/lib/api/stockApi';
+import { getCachedFeaturedStocks, FEATURED_SYMBOLS } from '@/lib/cache/prefetch';
 
 // Mock data functions
 function getMockCompanyName(symbol: string) {
@@ -13,6 +14,12 @@ function getMockCompanyName(symbol: string) {
     'MSFT': 'Microsoft Corporation',
     'GOOGL': 'Alphabet Inc.',
     'AMZN': 'Amazon.com Inc.',
+    'META': 'Meta Platforms, Inc.',
+    'TSLA': 'Tesla, Inc.',
+    'NVDA': 'NVIDIA Corporation',
+    'JPM': 'JPMorgan Chase & Co.',
+    'V': 'Visa Inc.',
+    'WMT': 'Walmart Inc.'
   };
   return names[symbol] || 'Unknown Company';
 }
@@ -23,6 +30,12 @@ function getRealisticMockPrice(symbol: string) {
     'MSFT': 420.35,
     'GOOGL': 175.98,
     'AMZN': 178.75,
+    'META': 485.20,
+    'TSLA': 175.30,
+    'NVDA': 950.25,
+    'JPM': 198.45,
+    'V': 275.60,
+    'WMT': 68.75
   };
   return prices[symbol] || 100.00;
 }
@@ -33,6 +46,12 @@ function getRealisticMockChange(symbol: string) {
     'MSFT': 5.2,
     'GOOGL': -1.8,
     'AMZN': 0.89,
+    'META': 7.35,
+    'TSLA': -2.45,
+    'NVDA': 15.80,
+    'JPM': 2.35,
+    'V': 3.25,
+    'WMT': -0.45
   };
   return changes[symbol] || 0.00;
 }
@@ -43,8 +62,35 @@ function getRealisticMockPercentChange(symbol: string) {
     'MSFT': 1.25,
     'GOOGL': -1.01,
     'AMZN': 0.5,
+    'META': 1.54,
+    'TSLA': -1.38,
+    'NVDA': 1.69,
+    'JPM': 1.20,
+    'V': 1.19,
+    'WMT': -0.65
   };
   return percentChanges[symbol] || 0.00;
+}
+
+// Helper function to get complete mock data for a symbol
+function getMockData(symbol: string) {
+  return {
+    symbol,
+    name: getMockCompanyName(symbol),
+    price: getRealisticMockPrice(symbol),
+    change: getRealisticMockChange(symbol),
+    percentChange: getRealisticMockPercentChange(symbol)
+  };
+}
+
+// Define the FeaturedStock type
+interface FeaturedStock {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  percentChange: number;
+  isMockData?: boolean;
 }
 
 export default function Home() {
@@ -54,162 +100,116 @@ export default function Home() {
     price: number;
     change: number;
     percentChange: number;
+    isMockData?: boolean;
   }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Featured stock symbols - using popular tech stocks
-  const featuredSymbols = useMemo(() => ['AAPL', 'MSFT', 'NVDA', 'AMZN'], []);
+  // Use the predefined list of featured symbols from the prefetch utility
+  const featuredSymbols = useMemo(() => FEATURED_SYMBOLS, []);
   
   useEffect(() => {
     const fetchFeaturedStocks = async () => {
       setIsLoading(true);
+      
       try {
-        const stocksData = await Promise.all(
-          featuredSymbols.map(async (symbol) => {
-            try {
-              console.log(`Fetching enhanced data for ${symbol}...`);
-              
-              // Use the enhanced API functions for better data
-              const stockDetails = await getEnhancedStockDetails(symbol);
-              const stockPrices = await getEnhancedStockPrices(symbol);
-              
-              if (stockDetails && stockPrices) {
-                // Get the daily prices for the latest price
-                const dailyPrices = stockPrices.daily;
-                
-                if (dailyPrices && dailyPrices.length > 0) {
-                  // For change calculation, use the first and last price points
-                  const latestPrice = dailyPrices[dailyPrices.length - 1].price;
-                  const previousPrice = dailyPrices[0].price;
-                  
-                  const priceChange = latestPrice - previousPrice;
-                  const percentChange = (priceChange / previousPrice) * 100;
-                  
-                  console.log(`Successfully fetched enhanced data for ${symbol}: $${latestPrice.toFixed(2)}`);
-                  
-                  return {
-                    symbol: stockDetails.symbol,
-                    name: stockDetails.name,
-                    price: latestPrice,
-                    change: priceChange,
-                    percentChange: percentChange
-                  };
-                }
-                
-                // If we don't have daily prices, try weekly prices
-                const weeklyPrices = stockPrices.weekly;
-                if (weeklyPrices && weeklyPrices.length > 1) {
-                  const latestPrice = weeklyPrices[weeklyPrices.length - 1].price;
-                  const previousPrice = weeklyPrices[weeklyPrices.length - 2].price;
-                  
-                  const priceChange = latestPrice - previousPrice;
-                  const percentChange = (priceChange / previousPrice) * 100;
-                  
-                  return {
-                    symbol: stockDetails.symbol,
-                    name: stockDetails.name,
-                    price: latestPrice,
-                    change: priceChange,
-                    percentChange: percentChange
-                  };
-                }
-              }
-              
-              throw new Error(`Insufficient data for ${symbol}`);
-            } catch (error) {
-              console.error(`Error fetching enhanced data for ${symbol}:`, error);
-              
-              // Fallback to regular getStockData which has better error handling
-              try {
-                const response = await getStockData(symbol);
-                
-                if (response.success && response.data) {
-                  const stockData = response.data;
-                  const prices = stockData.dailyPrices;
-                  
-                  if (prices && prices.length >= 2) {
-                    const latestPrice = prices[prices.length - 1].close;
-                    const previousPrice = prices[prices.length - 2].close;
-                    
-                    const priceChange = latestPrice - previousPrice;
-                    const percentChange = (priceChange / previousPrice) * 100;
-                    
-                    return {
-                      symbol: stockData.company.symbol,
-                      name: stockData.company.name,
-                      price: latestPrice,
-                      change: priceChange,
-                      percentChange: percentChange
-                    };
-                  }
-                }
-                
-                throw new Error(`Still couldn't get valid data for ${symbol}`);
-              } catch (fallbackError) {
-                console.error(`Fallback also failed for ${symbol}:`, fallbackError);
-                
-                // At this point, we'll use the mock data from the API's generateMockPrices function
-                // which has been improved to be more realistic
-                return null;
-              }
-            }
-          })
-        );
+        // First try to get cached featured stocks
+        const cachedStocks = await getCachedFeaturedStocks();
         
-        // Filter out any null values
-        const validStocks = stocksData.filter(stock => stock !== null) as {
-          symbol: string;
-          name: string;
-          price: number;
-          change: number;
-          percentChange: number;
-        }[];
-        
-        if (validStocks.length > 0) {
-          setFeaturedStocks(validStocks);
-        } else {
-          // If we have no valid stocks, we'll fetch them one by one with the regular API
-          // which has better fallback mechanisms
-          const fallbackStocks = await Promise.all(
-            featuredSymbols.map(async (symbol) => {
-              const response = await getStockData(symbol);
-              if (response.success && response.data) {
-                const stockData = response.data;
-                const prices = stockData.dailyPrices;
-                
-                if (prices && prices.length >= 1) {
-                  const latestPrice = prices[prices.length - 1].close;
-                  // If we only have one price point, we'll use a small random change
-                  const previousPrice = prices.length > 1 ? prices[0].close : latestPrice * (1 - (Math.random() * 0.02));
-                  
-                  const priceChange = latestPrice - previousPrice;
-                  const percentChange = (priceChange / previousPrice) * 100;
-                  
-                  return {
-                    symbol: stockData.company.symbol,
-                    name: stockData.company.name,
-                    price: latestPrice,
-                    change: priceChange,
-                    percentChange: percentChange
-                  };
-                }
-              }
-              return null;
-            })
-          );
+        if (cachedStocks && cachedStocks.length > 0) {
+          console.log('Using cached featured stocks data');
           
-          const validFallbackStocks = fallbackStocks.filter(stock => stock !== null) as {
-            symbol: string;
-            name: string;
-            price: number;
-            change: number;
-            percentChange: number;
-          }[];
+          // Transform cached stocks to match the expected format
+          const formattedStocks = cachedStocks.map(stock => ({
+            symbol: stock.symbol,
+            name: stock.name,
+            price: stock.price,
+            change: stock.change,
+            percentChange: stock.percentChange,
+            isMockData: stock.isMockData || false
+          }));
           
-          setFeaturedStocks(validFallbackStocks);
+          setFeaturedStocks(formattedStocks);
+          setIsLoading(false);
+          
+          // Refresh the cache in the background
+          fetch('/api/cache/refresh-featured')
+            .then(() => console.log('Featured stocks cache refreshed in background'))
+            .catch(error => console.error('Error refreshing featured stocks cache:', error));
+          
+          return;
         }
+        
+        // If no cached data, fall back to the existing implementation
+        const validStocks: FeaturedStock[] = [];
+        
+        for (const symbol of featuredSymbols) {
+          try {
+            console.log(`Fetching enhanced data for ${symbol}...`);
+            
+            // Get stock details
+            const details = await getEnhancedStockDetails(symbol);
+            
+            if (!details) {
+              throw new Error(`No details found for ${symbol}`);
+            }
+            
+            // Get daily prices
+            const prices = await getEnhancedStockPrices(symbol);
+            
+            if (!prices || prices.daily.length === 0) {
+              throw new Error(`No price data found for ${symbol}`);
+            }
+            
+            // Calculate price change
+            const latestPrice = prices.daily[prices.daily.length - 1].price;
+            let priceChange = 0;
+            let percentChange = 0;
+            
+            if (prices.daily.length >= 2) {
+              const previousPrice = prices.daily[0].price;
+              priceChange = latestPrice - previousPrice;
+              percentChange = (priceChange / previousPrice) * 100;
+            }
+            
+            console.log(`Successfully fetched enhanced data for ${symbol}: $${latestPrice.toFixed(2)}`);
+            
+            validStocks.push({
+              symbol,
+              name: details.name,
+              price: latestPrice,
+              change: priceChange,
+              percentChange: percentChange,
+              isMockData: false
+            });
+          } catch (error) {
+            console.error(`Error fetching data for ${symbol}:`, error);
+            
+            // Use fallback mock data
+            const mockData = getMockData(symbol);
+            if (mockData) {
+              validStocks.push({
+                ...mockData,
+                isMockData: true
+              });
+            }
+          }
+        }
+        
+        // Filter out any undefined stocks
+        const filteredStocks = validStocks.filter(Boolean);
+        setFeaturedStocks(filteredStocks);
       } catch (error) {
         console.error('Error fetching featured stocks:', error);
+        
+        // Use fallback mock data for all stocks
+        const mockStocks = featuredSymbols
+          .map(symbol => {
+            const mockData = getMockData(symbol);
+            return mockData ? { ...mockData, isMockData: true } : null;
+          })
+          .filter(Boolean) as FeaturedStock[];
+        
+        setFeaturedStocks(mockStocks);
       } finally {
         setIsLoading(false);
       }
@@ -261,6 +261,11 @@ export default function Home() {
                         <div>
                           <h3 className="text-lg font-bold">{stock.symbol}</h3>
                           <p className="text-sm text-gray-500">{stock.name}</p>
+                          {stock.isMockData && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
+                              Mock Data
+                            </span>
+                          )}
                         </div>
                         <div className={`text-right ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           <p className="text-lg font-bold">

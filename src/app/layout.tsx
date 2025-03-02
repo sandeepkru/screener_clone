@@ -5,7 +5,10 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SearchProvider } from "@/lib/utils/searchContext";
 import { Toaster } from "@/components/ui/sonner";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
+
+// Import server-side initialization script
+import "@/lib/init.server";
 
 const inter = Inter({ subsets: ["latin"] });
 

@@ -145,7 +145,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Stock Analysis and Screening Tool for Investors in India
+              Stock Analysis and Screening Tool for Investors
             </h1>
             <p className="text-xl mb-8">
               Research stocks, analyze financial data, and make informed investment decisions with our powerful screening tools.

@@ -273,7 +273,28 @@ export const getStockPriceData = async (
         return { success: true, data: prices };
       }
       
-      throw new Error('No price data found');
+      // No price data found, log and generate mock data instead of throwing an error
+      console.log(`No price data found for ${symbol} (${timeRange}), using mock data`);
+      
+      // Generate mock data as fallback
+      const days = timeRange === '1D' ? 1 : 
+                  timeRange === '1W' ? 7 : 
+                  timeRange === '1M' ? 30 : 
+                  timeRange === '3M' ? 90 : 
+                  timeRange === '1Y' ? 365 : 1825; // 5 years = 1825 days
+      
+      const mockPrices = generateMockPrices(symbol, timeRange, days);
+      console.log(`Generated ${mockPrices.length} mock price points for ${symbol} (${timeRange})`);
+      
+      // Cache the mock result
+      const cacheTtl = timeRange === '1D' ? CACHE_TTL.DAILY_PRICES : 
+                       timeRange === '1W' ? CACHE_TTL.WEEKLY_PRICES :
+                       timeRange === '1M' || timeRange === '3M' ? CACHE_TTL.MONTHLY_PRICES :
+                       CACHE_TTL.YEARLY_PRICES;
+      
+      await cacheService.set(cacheKey, mockPrices, cacheTtl);
+      
+      return { success: true, data: mockPrices };
     } catch (apiError) {
       console.error(`API error for ${symbol} (${timeRange}):`, apiError);
       console.log(`Falling back to mock data for ${symbol} (${timeRange})`);
@@ -297,7 +318,6 @@ export const getStockPriceData = async (
       await cacheService.set(cacheKey, mockPrices, cacheTtl);
       
       return { success: true, data: mockPrices };
-      
     }
   } catch (error) {
     console.error(`Error fetching stock price data for ${symbol} (${timeRange}):`, error);
